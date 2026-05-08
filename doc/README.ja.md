@@ -2,6 +2,8 @@
 
 # Intel RealSense Docker コンテナ（ROS 2 Humble）
 
+[![CI](https://github.com/ycpss91255-docker/realsense_humble/actions/workflows/main.yaml/badge.svg)](https://github.com/ycpss91255-docker/realsense_humble/actions/workflows/main.yaml) [![License](https://img.shields.io/badge/License-Apache--2.0-blue?style=flat-square)](../LICENSE)
+
 > **TL;DR** — コンテナ化された Intel RealSense ROS 2 Humble ドライバ。apt で `realsense2_camera` と `librealsense2` をインストールし、デバイスアクセス用の udev ルールを含みます。
 >
 > ```bash

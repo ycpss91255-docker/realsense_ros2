@@ -2,6 +2,8 @@
 
 # Intel RealSense Docker 容器（ROS 2 Humble）
 
+[![CI](https://github.com/ycpss91255-docker/realsense_humble/actions/workflows/main.yaml/badge.svg)](https://github.com/ycpss91255-docker/realsense_humble/actions/workflows/main.yaml) [![License](https://img.shields.io/badge/License-Apache--2.0-blue?style=flat-square)](../LICENSE)
+
 > **TL;DR** — 容器化的 Intel RealSense ROS 2 Humble 驅動程式。透過 apt 安裝 `realsense2_camera` 和 `librealsense2`，內含 udev 規則以存取裝置。
 >
 > ```bash
