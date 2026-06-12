@@ -18,7 +18,7 @@
 |------|-------------|
 | `realsense2_camera is installed` | `ros-${ROS_DISTRO}-realsense2-camera` package installed |
 | `realsense2_description is installed` | `ros-${ROS_DISTRO}-realsense2-description` package installed |
-| `RealSense SDK tools load their shared libraries (rs-enumerate-devices)` | SDK CLI tools (rs-enumerate-devices/realsense-viewer/rs-*) load their libs and run with ROS sourced |
+| `RealSense SDK tool libraries resolve (rs-enumerate-devices)` | SDK CLI tool's shared libraries (librealsense2.so) all resolve via ldd with ROS sourced |
 
 ### Base tools (4)
 
