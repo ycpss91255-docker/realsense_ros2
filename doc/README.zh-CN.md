@@ -147,7 +147,7 @@ graph TD
 
 ## Smoke Tests
 
-详见 [TEST.md](test/TEST.md)。
+构建期自动测试详见 [TEST.md](test/TEST.md)；实机相机测试见 [CAMERA.md](test/CAMERA.md)。
 
 ## 目录结构
 
@@ -179,7 +179,9 @@ realsense_ros2/
 │   ├── README.zh-CN.md          # 简体中文
 │   ├── README.ja.md             # 日文
 │   ├── changelog/CHANGELOG.md
-│   └── test/TEST.md
+│   └── test/
+│       ├── TEST.md             # 构建期自动 smoke 测试
+│       └── CAMERA.md           # 实机相机手动测试
 ├── .github/workflows/
 │   └── main.yaml                # CI（调用 base 可复用的 build/release worker）
 └── test/
