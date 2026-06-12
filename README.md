@@ -2,16 +2,14 @@
 
 [![CI](https://github.com/ycpss91255-docker/realsense_ros2/actions/workflows/main.yaml/badge.svg)](https://github.com/ycpss91255-docker/realsense_ros2/actions/workflows/main.yaml) [![License](https://img.shields.io/badge/License-Apache--2.0-blue?style=flat-square)](./LICENSE)
 
-[![CI](https://github.com/ycpss91255-docker/realsense_ros2/actions/workflows/main.yaml/badge.svg)](https://github.com/ycpss91255-docker/realsense_ros2/actions/workflows/main.yaml)
-
 **[English](README.md)** | **[繁體中文](doc/README.zh-TW.md)** | **[简体中文](doc/README.zh-CN.md)** | **[日本語](doc/README.ja.md)**
 
 ## TL;DR
 
-Containerized Intel RealSense driver for ROS 2. Installs `realsense2_camera` and `librealsense2` from apt, includes udev rules for device access.
+Containerized Intel RealSense driver for ROS 2. Installs `realsense2-camera` and `realsense2-description` from apt (which pull in `librealsense2` transitively), includes udev rules for device access.
 
 ```bash
-./build.sh && ./run.sh
+just build && just run
 ```
 
 ---
@@ -31,11 +29,11 @@ Containerized Intel RealSense driver for ROS 2. Installs `realsense2_camera` and
 
 ## Overview
 
-Provides a reproducible ROS 2 environment for Intel RealSense depth cameras. The container installs `realsense2_camera` and `librealsense2` from the ROS 2 apt repository and ships with the upstream udev rules baked in so USB devices come up under the correct permissions inside the container. Multi-arch base image supports x86_64 and ARM64 (Raspberry Pi, Jetson CPU mode).
+Provides a reproducible ROS 2 environment for Intel RealSense depth cameras. The container installs the `ros-humble-realsense2-camera` and `ros-humble-realsense2-description` packages from the ROS 2 apt repository (the `librealsense2` libraries come in transitively as their dependency) and ships with the upstream udev rules baked in so USB devices come up under the correct permissions inside the container. Multi-arch base image supports x86_64 and ARM64 (Raspberry Pi, Jetson CPU mode).
 
 ## Features
 
-- **Apt-based install**: `realsense2_camera` and `librealsense2` from ROS 2 apt repository
+- **Apt-based install**: `realsense2-camera` and `realsense2-description` from ROS 2 apt repository (`librealsense2` pulled in transitively)
 - **Smoke Test**: Bats tests run automatically during build to verify environment
 - **Docker Compose**: single `compose.yaml` manages all targets
 - **udev rules**: Pre-configured for RealSense USB device access
@@ -45,10 +43,10 @@ Provides a reproducible ROS 2 environment for Intel RealSense depth cameras. The
 
 ```bash
 # 1. Build
-./build.sh
+just build
 
-# 2. Run (default: realsense2_camera rs_launch.py)
-./run.sh
+# 2. Run (default: ros2 launch realsense2_camera rs_launch.py)
+just run
 
 # Or use docker compose directly
 docker compose up runtime
@@ -59,36 +57,51 @@ docker compose down
 
 ### Runtime
 
-```bash
-./build.sh                       # Build (default: runtime)
-./build.sh --no-env test         # Build without refreshing .env
-./run.sh                         # Start (default: runtime)
-./exec.sh                        # Enter running container
-./stop.sh                        # Stop and remove containers
+The user entry point is `just` (the repo-root `justfile` symlinks into the base
+subtree). Recipes forward 1:1 to the wrapper scripts under `script/` with full
+argument passthrough -- no `--` separator needed.
 
-docker compose build runtime     # Equivalent command
+```bash
+just build                       # Build (default: devel)
+just build test                  # Build the devel-test gate
+just run                         # Start (e.g. just run -d)
+just exec                        # Enter running container
+just stop                        # Stop and remove containers
+just setup                       # Regenerate .env + compose.yaml from setup.conf
+
+docker compose build runtime     # Equivalent low-level command
 docker compose up runtime        # Start
 docker compose exec runtime bash # Enter running container
 ```
 
-### Testing (test)
+### Smoke tests (test stages)
 
-Smoke tests run automatically during build; build fails if tests fail.
+Smoke tests run automatically during build; the build fails if tests fail. The
+`devel-test` stage runs lint (ShellCheck + Hadolint) plus the bats suite, and
+the `runtime-test` stage runs an ldd-resolution check over the installed
+`realsense2_camera` libraries.
 
 ```bash
-./build.sh test
+just build test
 # or
 docker compose --profile test build test
 ```
 
 ## Configuration
 
-### .env Parameters
+### Configuration surface (setup.conf)
 
-| Variable | Description | Example |
-|----------|-------------|---------|
-| `DOCKER_HUB_USER` | Docker Hub username | `myuser` |
-| `IMAGE_NAME` | Image name | `realsense_ros2` |
+The real configuration surface is `config/docker/setup.conf`. `just setup`
+generates `.env` and `compose.yaml` from it, so `.env` is a generated artifact
+and should not be hand-edited. Edit `setup.conf` (or `just setup-tui`) and
+re-run `just setup`.
+
+`setup.conf` is organised into sections -- `[image]`, `[build]`, `[deploy]`,
+`[gui]`, `[network]`, `[security]`, `[resources]`, `[environment]`, `[tmpfs]`,
+`[devices]`, `[volumes]`. For example, the `[deploy]` section carries the GPU
+runtime keys (`gpu_mode`, `gpu_count`, `gpu_capabilities`, `gpu_runtime`), and
+`[image]` derives the image name from naming rules rather than a literal
+`image_name` key.
 
 ### RealSense udev Rules
 
@@ -100,30 +113,44 @@ The container includes udev rules at `/etc/udev/rules.d/99-realsense-libusb.rule
 
 ```mermaid
 graph TD
-    EXT1["bats/bats:latest"]
-    EXT2["alpine:latest"]
-    EXT3["ros:humble-ros-base-jammy"]
+    EXT1["bats/bats:1.11.0"]
+    EXT2["alpine:3.21"]
+    EXT3["alpine:3.21"]
+    EXT4["ros:humble-ros-base-jammy"]
 
-    EXT1 --> bats-src["bats-src"]
-    EXT2 --> bats-ext["bats-extensions"]
+    EXT1 --> batssrc["bats-src"]
+    EXT2 --> batsext["bats-extensions"]
+    EXT3 --> lint["lint-tools"]
 
-    EXT3 --> runtime["runtime\nrealsense2_camera + librealsense2 + udev rules"]
+    EXT4 --> sys["sys"]
 
-    bats-src --> test["test (ephemeral)\nsmoke tests, discarded after build"]
-    bats-ext --> test
-    runtime --> test
+    sys --> develbase["devel-base"]
+    develbase --> devel["devel\n(shipped)"]
+    devel --> develtest["devel-test (ephemeral)\nlint + bats /smoke_test/"]
 
+    sys --> runtimebase["runtime-base"]
+    runtimebase --> runtime["runtime\n(shipped)\nrealsense2_camera + udev rules"]
+    runtime --> runtimetest["runtime-test (ephemeral)\nldd-resolution smoke"]
+
+    lint --> develtest
+    batssrc --> develtest
+    batsext --> develtest
 ```
 
 ### Stage Description
 
 | Stage | FROM | Purpose |
 |-------|------|---------|
-| `bats-src` | `bats/bats:latest` | Bats binary source, not shipped |
-| `bats-extensions` | `alpine:latest` | bats-support, bats-assert, not shipped |
-| `lint-tools` | `alpine:latest` | ShellCheck + Hadolint, not shipped |
-| `runtime` | `ros:humble-ros-base-jammy` | RealSense packages + udev rules |
-| `test` | `runtime` | Lints + smoke tests, discarded after build |
+| `bats-src` | `bats/bats:1.11.0` | Bats binary source, not shipped |
+| `bats-extensions` | `alpine:3.21` | bats-support, bats-assert, not shipped |
+| `lint-tools` | `alpine:3.21` | ShellCheck + Hadolint, not shipped |
+| `sys` | `ros:humble-ros-base-jammy` | Common base: user, locale, timezone (base v0.41.0 build contract) |
+| `devel-base` | `sys` | Dev tools + RealSense packages |
+| `devel` | `devel-base` | Shipped dev image (default CMD `bash`) |
+| `devel-test` | `devel` | Lint + smoke tests, discarded after build (ephemeral) |
+| `runtime-base` | `sys` | Minimal base (`sudo`, `tini`) |
+| `runtime` | `runtime-base` | Shipped runtime image: RealSense packages + udev rules (default CMD `ros2 launch realsense2_camera rs_launch.py`) |
+| `runtime-test` | `runtime` | ldd-resolution smoke over `realsense2_camera` libs, discarded after build (ephemeral) |
 
 ## Smoke Tests
 
@@ -133,29 +160,36 @@ See [TEST.md](doc/test/TEST.md) for details.
 
 ```text
 realsense_ros2/
-├── compose.yaml                 # Docker Compose definition
 ├── Dockerfile                   # Multi-stage build
-├── build.sh                     # Build script
-├── run.sh                       # Run script
-├── exec.sh                      # Enter running container
-├── stop.sh                      # Stop and remove containers
-├── .hadolint.yaml               # Hadolint ignore rules
+├── LICENSE
+├── README.md
+├── justfile -> .base/script/docker/justfile        # symlink (user entry point)
+├── .hadolint.yaml -> .base/.hadolint.yaml          # symlink
+├── .base/                       # base subtree (read-only; v0.41.0)
 ├── script/
-│   └── entrypoint.sh            # Container entrypoint
+│   ├── entrypoint.sh            # Container entrypoint (repo-owned)
+│   ├── build.sh -> ../.base/script/docker/wrapper/build.sh   # symlink
+│   ├── run.sh   -> ../.base/script/docker/wrapper/run.sh     # symlink
+│   ├── exec.sh  -> ../.base/script/docker/wrapper/exec.sh    # symlink
+│   ├── stop.sh  -> ../.base/script/docker/wrapper/stop.sh    # symlink
+│   ├── prune.sh -> ../.base/script/docker/wrapper/prune.sh   # symlink
+│   ├── setup.sh -> ../.base/script/docker/wrapper/setup.sh   # symlink
+│   ├── setup_tui.sh -> ../.base/script/docker/wrapper/setup_tui.sh  # symlink
+│   └── hooks/                   # pre/ + post/ wrapper hooks
 ├── config/
+│   ├── docker/
+│   │   └── setup.conf           # configuration surface (.env/compose.yaml generated from this)
 │   └── realsense/
 │       └── 99-realsense-libusb.rules  # RealSense udev rules
 ├── doc/
 │   ├── README.zh-TW.md          # Traditional Chinese
 │   ├── README.zh-CN.md          # Simplified Chinese
-│   └── README.ja.md             # Japanese
-├── .github/workflows/           # CI/CD
-│   ├── main.yaml                # Main pipeline
-│   ├── build-worker.yaml        # Docker build + smoke test
-│   └── release-worker.yaml      # GitHub Release
+│   ├── README.ja.md             # Japanese
+│   ├── changelog/CHANGELOG.md
+│   └── test/TEST.md
+├── .github/workflows/
+│   └── main.yaml                # CI (calls base reusable build/release workers)
 └── test/
-    └── smoke/              # Bats environment tests
-        ├── ros_env.bats
-        ├── script_help.bats
-        └── test_helper.bash
+    └── smoke/                   # repo-owned bats tests
+        └── ros_env.bats         # (helper + more .bats come from .base/test/smoke/)
 ```
