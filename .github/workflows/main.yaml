@@ -1,4 +1,4 @@
-name: Main CI/CD Pipeline
+name: CI
 run-name: ${{ github.actor }} triggered CI/CD on ${{ github.ref_name }}
 
 on:
