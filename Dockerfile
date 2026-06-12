@@ -122,6 +122,10 @@ RUN apt-get update && \
         bash-completion \
         python3-colcon-argcomplete \
         ros-${ROS_DISTRO}-ros2cli \
+        # ROS 2 desktop (devel only): rviz2 + the Qt/OpenGL/X stack that GUI
+        # tools such as realsense-viewer and rviz2 need. The runtime image
+        # stays on ros-base (this is in devel-base, not the runtime branch).
+        ros-${ROS_DISTRO}-desktop \
         # RealSense packages
         ros-${ROS_DISTRO}-realsense2-camera \
         ros-${ROS_DISTRO}-realsense2-description \

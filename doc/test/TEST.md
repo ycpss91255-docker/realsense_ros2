@@ -1,16 +1,17 @@
 # TEST.md
 
-**58 tests** total.
+**61 tests** total.
 
 ## test/smoke/ros_env.bats
 
-### ROS environment (3)
+### ROS environment (4)
 
 | Test | Description |
 |------|-------------|
 | `ROS_DISTRO is set` | ROS_DISTRO environment variable is set |
 | `ROS 2 setup.bash exists` | `/opt/ros/${ROS_DISTRO}/setup.bash` exists |
 | `ROS 2 setup.bash can be sourced` | ROS 2 setup script sources without error |
+| `interactive shells source ROS (ros2 on PATH via bashrc.d)` | `config/shell/bashrc.d/10-ros-source.sh` puts `ros2` on PATH for interactive shells |
 
 ### RealSense packages (3)
 
@@ -19,6 +20,13 @@
 | `realsense2_camera is installed` | `ros-${ROS_DISTRO}-realsense2-camera` package installed |
 | `realsense2_description is installed` | `ros-${ROS_DISTRO}-realsense2-description` package installed |
 | `RealSense SDK tool libraries resolve (rs-enumerate-devices)` | SDK CLI tool's shared libraries (librealsense2.so) all resolve via ldd with ROS sourced |
+
+### Desktop GUI (devel) (2)
+
+| Test | Description |
+|------|-------------|
+| `ROS 2 desktop is installed (rviz2 on PATH)` | `ros-${ROS_DISTRO}-desktop` provides rviz2 in the devel image |
+| `Qt xcb platform plugin is present (realsense-viewer / rviz2 GUI)` | `libqxcb.so` present so Qt GUI tools can open a window |
 
 ### Base tools (4)
 

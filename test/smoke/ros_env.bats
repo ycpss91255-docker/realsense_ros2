@@ -19,6 +19,17 @@ setup() {
     assert_success
 }
 
+@test "interactive shells source ROS (ros2 on PATH via bashrc.d)" {
+    # The base bashrc is ROS-agnostic and loads ~/.bashrc.d/*.sh for interactive
+    # shells; this repo ships config/shell/bashrc.d/10-ros-source.sh to source
+    # ROS. Without it, ros2 / realsense-viewer / rviz2 are "command not found"
+    # in interactive just run / just exec shells even though they are installed.
+    assert [ -f "${HOME}/.bashrc.d/10-ros-source.sh" ]
+    run bash -c "source ${HOME}/.bashrc.d/10-ros-source.sh && command -v ros2"
+    assert_success
+    assert_output --partial "/opt/ros/${ROS_DISTRO}/bin/ros2"
+}
+
 # -------------------- RealSense packages --------------------
 
 @test "realsense2_camera is installed" {
@@ -43,6 +54,23 @@ setup() {
     run bash -c "source /opt/ros/${ROS_DISTRO}/setup.bash && ldd /opt/ros/${ROS_DISTRO}/bin/rs-enumerate-devices"
     assert_success
     refute_output --partial "not found"
+}
+
+# -------------------- Desktop GUI (devel) --------------------
+
+@test "ROS 2 desktop is installed (rviz2 on PATH)" {
+    # devel-base installs ros-${ROS_DISTRO}-desktop so GUI tools (rviz2,
+    # realsense-viewer) are available; the runtime image stays on ros-base.
+    run bash -c "source /opt/ros/${ROS_DISTRO}/setup.bash && command -v rviz2"
+    assert_success
+    assert_output --partial "/opt/ros/${ROS_DISTRO}/bin/rviz2"
+}
+
+@test "Qt xcb platform plugin is present (realsense-viewer / rviz2 GUI)" {
+    # GUI Qt apps dlopen the xcb platform plugin at startup; ros-base lacks it,
+    # ros-${ROS_DISTRO}-desktop provides it. Its absence is why realsense-viewer
+    # fails to open a window even when its direct ldd deps resolve.
+    assert [ -n "$(find /usr/lib -name libqxcb.so 2>/dev/null | head -1)" ]
 }
 
 # -------------------- Base tools --------------------
