@@ -234,14 +234,32 @@ CMD ["ros2", "launch", "realsense2_camera", "rs_launch.py"]
 
 ############################## runtime-test (ephemeral) ##############################
 # Install-check smoke for the runtime image (template v0.21.1+ #243).
-# Default smoke verifies USER + bash on PATH. Override per-repo via
-# build_args: RUNTIME_SMOKE_CMD=<command> (constraint: CLI-only, no
-# GUI binaries that init Qt / OGRE on --version / --help).
 #
-# `sh -c` wrapper required: bare `RUN ${ARG}` word-splits operators
-# (&&, ||) and nested quotes. The wrapper passes the value as a
-# single string for sh to parse normally.
+# This repo overrides the default smoke (USER + bash) to verify that the
+# realsense2_camera node's shared libraries all resolve in the runtime
+# image -- the exact regression class that went undetected in
+# ros1_bridge#123 (a missing transitive .so the devel-stage bats never
+# exercised, because devel carries the full build deps). ldd every
+# installed file under the package lib dir and fail on any "not found";
+# the non-empty guard prevents a vacuous pass if the dir is ever
+# missing/empty.
+#
+# `bash -c` (not `sh -c`): the command sources ROS setup.bash and uses a
+# bash for-loop. The inner bash runs without the outer SHELL's
+# -euo pipefail, so `source` under nounset is safe (matches ros1_bridge).
 FROM runtime AS runtime-test
 
-ARG RUNTIME_SMOKE_CMD='whoami && bash --version'
-RUN sh -c "${RUNTIME_SMOKE_CMD}"
+ARG RUNTIME_SMOKE_CMD='whoami && bash --version && \
+  source /opt/ros/${ROS_DISTRO}/setup.bash && \
+  rs_dir="/opt/ros/${ROS_DISTRO}/lib/realsense2_camera" && \
+  test -d "${rs_dir}" && \
+  bins="$(find "${rs_dir}" -maxdepth 1 -type f)" && \
+  test -n "${bins}" && \
+  for f in ${bins}; do \
+    echo "--- ldd: ${f} ---"; ldd "${f}" || true; \
+    if ldd "${f}" 2>&1 | grep -q "not found"; then \
+      echo "RUNTIME SMOKE FAIL: unresolved shared library in ${f}"; exit 1; \
+    fi; \
+  done && \
+  echo "RUNTIME SMOKE OK: realsense2_camera shared libraries resolved"'
+RUN bash -c "${RUNTIME_SMOKE_CMD}"
