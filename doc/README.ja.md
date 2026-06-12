@@ -1,10 +1,10 @@
 **[English](../README.md)** | **[繁體中文](README.zh-TW.md)** | **[简体中文](README.zh-CN.md)** | **[日本語](README.ja.md)**
 
-# Intel RealSense Docker コンテナ（ROS 2 Humble）
+# Intel RealSense Docker コンテナ（ROS 2）
 
-[![CI](https://github.com/ycpss91255-docker/realsense_humble/actions/workflows/main.yaml/badge.svg)](https://github.com/ycpss91255-docker/realsense_humble/actions/workflows/main.yaml) [![License](https://img.shields.io/badge/License-Apache--2.0-blue?style=flat-square)](../LICENSE)
+[![CI](https://github.com/ycpss91255-docker/realsense_ros2/actions/workflows/main.yaml/badge.svg)](https://github.com/ycpss91255-docker/realsense_ros2/actions/workflows/main.yaml) [![License](https://img.shields.io/badge/License-Apache--2.0-blue?style=flat-square)](../LICENSE)
 
-> **TL;DR** — コンテナ化された Intel RealSense ROS 2 Humble ドライバ。apt で `realsense2_camera` と `librealsense2` をインストールし、デバイスアクセス用の udev ルールを含みます。
+> **TL;DR** — コンテナ化された Intel RealSense ROS 2 ドライバ。apt で `realsense2_camera` と `librealsense2` をインストールし、デバイスアクセス用の udev ルールを含みます。
 >
 > ```bash
 > ./build.sh && ./run.sh
@@ -77,7 +77,7 @@ docker compose --profile test build test
 | 変数 | 説明 | 例 |
 |------|------|-----|
 | `DOCKER_HUB_USER` | Docker Hub ユーザー名 | `myuser` |
-| `IMAGE_NAME` | イメージ名 | `realsense_humble` |
+| `IMAGE_NAME` | イメージ名 | `realsense_ros2` |
 
 ### RealSense udev ルール
 
@@ -121,14 +121,13 @@ graph TD
 ## ディレクトリ構成
 
 ```text
-realsense_humble/
+realsense_ros2/
 ├── compose.yaml                 # Docker Compose 定義
 ├── Dockerfile                   # マルチステージビルド
 ├── build.sh                     # ビルドスクリプト
 ├── run.sh                       # 実行スクリプト
 ├── exec.sh                      # 実行中のコンテナに入る
 ├── stop.sh                      # コンテナを停止・削除
-├── .env.example                 # 環境変数テンプレート
 ├── .hadolint.yaml               # Hadolint 無視ルール
 ├── script/
 │   └── entrypoint.sh            # コンテナエントリポイント

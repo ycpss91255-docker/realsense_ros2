@@ -1,14 +1,14 @@
-# Intel RealSense Docker Container (ROS 2 Humble)
+# Intel RealSense Docker Container (ROS 2)
 
-[![CI](https://github.com/ycpss91255-docker/realsense_humble/actions/workflows/main.yaml/badge.svg)](https://github.com/ycpss91255-docker/realsense_humble/actions/workflows/main.yaml) [![License](https://img.shields.io/badge/License-Apache--2.0-blue?style=flat-square)](./LICENSE)
+[![CI](https://github.com/ycpss91255-docker/realsense_ros2/actions/workflows/main.yaml/badge.svg)](https://github.com/ycpss91255-docker/realsense_ros2/actions/workflows/main.yaml) [![License](https://img.shields.io/badge/License-Apache--2.0-blue?style=flat-square)](./LICENSE)
 
-[![CI](https://github.com/ycpss91255-docker/realsense_humble/actions/workflows/main.yaml/badge.svg)](https://github.com/ycpss91255-docker/realsense_humble/actions/workflows/main.yaml)
+[![CI](https://github.com/ycpss91255-docker/realsense_ros2/actions/workflows/main.yaml/badge.svg)](https://github.com/ycpss91255-docker/realsense_ros2/actions/workflows/main.yaml)
 
 **[English](README.md)** | **[繁體中文](doc/README.zh-TW.md)** | **[简体中文](doc/README.zh-CN.md)** | **[日本語](doc/README.ja.md)**
 
 ## TL;DR
 
-Containerized Intel RealSense driver for ROS 2 Humble. Installs `realsense2_camera` and `librealsense2` from apt, includes udev rules for device access.
+Containerized Intel RealSense driver for ROS 2. Installs `realsense2_camera` and `librealsense2` from apt, includes udev rules for device access.
 
 ```bash
 ./build.sh && ./run.sh
@@ -31,7 +31,7 @@ Containerized Intel RealSense driver for ROS 2 Humble. Installs `realsense2_came
 
 ## Overview
 
-Provides a reproducible ROS 2 Humble environment for Intel RealSense depth cameras. The container installs `realsense2_camera` and `librealsense2` from the ROS 2 apt repository and ships with the upstream udev rules baked in so USB devices come up under the correct permissions inside the container. Multi-arch base image supports x86_64 and ARM64 (Raspberry Pi, Jetson CPU mode).
+Provides a reproducible ROS 2 environment for Intel RealSense depth cameras. The container installs `realsense2_camera` and `librealsense2` from the ROS 2 apt repository and ships with the upstream udev rules baked in so USB devices come up under the correct permissions inside the container. Multi-arch base image supports x86_64 and ARM64 (Raspberry Pi, Jetson CPU mode).
 
 ## Features
 
@@ -88,7 +88,7 @@ docker compose --profile test build test
 | Variable | Description | Example |
 |----------|-------------|---------|
 | `DOCKER_HUB_USER` | Docker Hub username | `myuser` |
-| `IMAGE_NAME` | Image name | `realsense_humble` |
+| `IMAGE_NAME` | Image name | `realsense_ros2` |
 
 ### RealSense udev Rules
 
@@ -132,14 +132,13 @@ See [TEST.md](doc/test/TEST.md) for details.
 ## Directory Structure
 
 ```text
-realsense_humble/
+realsense_ros2/
 ├── compose.yaml                 # Docker Compose definition
 ├── Dockerfile                   # Multi-stage build
 ├── build.sh                     # Build script
 ├── run.sh                       # Run script
 ├── exec.sh                      # Enter running container
 ├── stop.sh                      # Stop and remove containers
-├── .env.example                 # Environment variable template
 ├── .hadolint.yaml               # Hadolint ignore rules
 ├── script/
 │   └── entrypoint.sh            # Container entrypoint
