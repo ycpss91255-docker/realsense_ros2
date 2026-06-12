@@ -1,6 +1,6 @@
 # TEST.md
 
-**44 tests** total.
+**57 tests** total.
 
 ## test/smoke/ros_env.bats
 
@@ -28,12 +28,14 @@
 | `sudo is available` | sudo command works |
 | `sudo passwordless works` | sudo runs without password |
 
-### System (7)
+### System (9)
 
 | Test | Description |
 |------|-------------|
 | `User is not root` | Container user is not root |
 | `HOME is set and exists` | HOME is set and directory exists |
+| `container user matches the configured USER_NAME (base v0.41.0 build contract)` | Container user matches configured USER_NAME |
+| `HOME path matches the container user` | HOME path matches the container user |
 | `Timezone is Asia/Taipei` | Timezone configured correctly |
 | `LANG is en_US.UTF-8` | LANG locale set |
 | `LC_ALL is en_US.UTF-8` | LC_ALL locale set |
@@ -46,23 +48,25 @@
 |------|-------------|
 | `Work directory exists` | `${HOME}/work` directory exists |
 
-## template/test/smoke/script_help.bats
+## .base/test/smoke/script_help.bats
 
-### build.sh (3)
+### build.sh (4)
 
 | Test | Description |
 |------|-------------|
 | `build.sh -h exits 0` | Help exits successfully |
 | `build.sh --help exits 0` | Help exits successfully |
 | `build.sh -h prints usage` | Help output contains "Usage:" |
+| `build.sh -h describes auto-apply default (no stale 'warn on drift', #365)` | Help describes auto-apply default |
 
-### run.sh (3)
+### run.sh (4)
 
 | Test | Description |
 |------|-------------|
 | `run.sh -h exits 0` | Help exits successfully |
 | `run.sh --help exits 0` | Help exits successfully |
 | `run.sh -h prints usage` | Help output contains "Usage:" |
+| `run.sh -h describes auto-apply default (no stale 'warn on drift', #365)` | Help describes auto-apply default |
 
 ### exec.sh (3)
 
@@ -89,7 +93,21 @@
 | `build.sh defaults to en for LANG=en_US.UTF-8` | Defaults to English |
 | `build.sh SETUP_LANG overrides LANG` | SETUP_LANG takes priority |
 
-## template/test/smoke/display_env.bats
+### Help --lang override (9)
+
+| Test | Description |
+|------|-------------|
+| `build.sh --help --lang zh-TW prints zh-TW usage (#222)` | build.sh zh-TW help |
+| `build.sh --help --lang zh-CN prints zh-CN usage (#222)` | build.sh zh-CN help |
+| `build.sh --help --lang ja prints ja usage (#222)` | build.sh ja help |
+| `run.sh --help --lang zh-TW prints zh-TW usage (#222)` | run.sh zh-TW help |
+| `run.sh --help --lang ja prints ja usage (#222)` | run.sh ja help |
+| `exec.sh --help --lang zh-TW prints zh-TW usage (#222)` | exec.sh zh-TW help |
+| `exec.sh --help --lang ja prints ja usage (#222)` | exec.sh ja help |
+| `stop.sh --help --lang zh-TW prints zh-TW usage (#222)` | stop.sh zh-TW help |
+| `stop.sh --help --lang ja prints ja usage (#222)` | stop.sh ja help |
+
+## .base/test/smoke/display_env.bats
 
 ### Wayland env vars (3)
 
