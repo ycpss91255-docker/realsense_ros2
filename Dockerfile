@@ -26,10 +26,20 @@ RUN apk add --no-cache curl xz && \
 ############################## sys ##############################
 FROM ros:${ROS_DISTRO}-${ROS_TAG}-${UBUNTU_CODENAME} AS sys
 
-ARG USER="initial"
-ARG GROUP="initial"
-ARG UID="1000"
-ARG GID="${UID}"
+# base v0.41.0 build contract: compose / CI inject USER_NAME / USER_GROUP /
+# USER_UID / USER_GID (not the legacy USER / GROUP / UID / GID). Declare the
+# new names and alias the legacy ones from them so the rest of this stage's
+# user-creation logic stays unchanged. Without this the injected build-args
+# are dropped and the image is built as the default user, breaking `just run`
+# (image HOME != compose's /home/${USER_NAME}/work mount).
+ARG USER_NAME="user"
+ARG USER_GROUP="user"
+ARG USER_UID="1000"
+ARG USER_GID="${USER_UID}"
+ARG USER="${USER_NAME}"
+ARG GROUP="${USER_GROUP}"
+ARG UID="${USER_UID}"
+ARG GID="${USER_GID}"
 ARG SHELL="/bin/bash"
 ARG HARDWARE="x86_64"
 ENV HOME="/home/${USER}"
@@ -122,8 +132,10 @@ RUN apt-get update && \
 ############################## devel ##############################
 FROM devel-base AS devel
 
-ARG USER
-ARG GROUP
+ARG USER_NAME="user"
+ARG USER_GROUP="user"
+ARG USER="${USER_NAME}"
+ARG GROUP="${USER_GROUP}"
 ARG ENTRYPOINT_FILE="script/entrypoint.sh"
 ARG CONFIG_DIR="/tmp/config"
 ARG SETUP_DIR="/tmp/setup"
@@ -169,8 +181,11 @@ COPY --from=lint-tools /usr/local/bin/hadolint /usr/local/bin/hadolint
 # Lint: ShellCheck (.sh) + Hadolint (Dockerfile)
 COPY .hadolint.yaml /lint/.hadolint.yaml
 COPY Dockerfile /lint/Dockerfile
+# base v0.41.0 moved the wrapper scripts under .base/script/docker/wrapper/,
+# so the old `COPY .base/script/docker/*.sh` glob matched nothing and broke
+# this stage. The repo's own script/*.sh are symlinks to those wrappers, so
+# `COPY script/*.sh /lint/` already dereferences and lints them.
 COPY script/*.sh /lint/
-COPY .base/script/docker/*.sh /lint/
 COPY .base/script/docker/lib /lint/lib
 RUN shellcheck -S warning /lint/*.sh /lint/lib/*.sh
 WORKDIR /lint
@@ -188,7 +203,12 @@ ENV BATS_LIB_PATH="/usr/lib/bats"
 COPY .base/test/smoke/ /smoke_test/
 COPY test/smoke/ /smoke_test/
 
-ARG USER
+ARG USER_NAME="user"
+ARG USER="${USER_NAME}"
+# Surface the configured user so the smoke test can assert the image was
+# actually built as it (regression guard for the USER_NAME build contract).
+# Ephemeral devel-test stage only -- not shipped in devel/runtime.
+ENV CONTAINER_EXPECTED_USER="${USER_NAME}"
 USER "${USER}"
 
 RUN bats /smoke_test/
@@ -208,7 +228,8 @@ RUN apt-get update && \
 FROM runtime-base AS runtime
 
 ARG ROS_DISTRO
-ARG USER
+ARG USER_NAME="user"
+ARG USER="${USER_NAME}"
 
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
