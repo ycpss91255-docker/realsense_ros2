@@ -20,7 +20,7 @@ sure no other process holds the camera.
 
 ```bash
 just build    # first time, or after changes
-just run      # interactive shell; ROS is already sourced (via the entrypoint)
+just run      # interactive shell; ROS is auto-sourced (via ~/.bashrc.d)
 ```
 
 ## 2. Quick check -- is the camera detected (SDK level)
@@ -48,23 +48,25 @@ ros2 topic hz /camera/camera/depth/image_rect_raw     # confirm streaming (Hz)
 ros2 topic echo /camera/camera/color/image_raw --once
 ```
 
-If `ros2` is not found in a `just exec` shell, source ROS first:
-`source /opt/ros/${ROS_DISTRO}/setup.bash` (the `just run` shell already has it).
+Interactive shells (`just run` and `just exec bash`) auto-source ROS via
+`~/.bashrc.d`. Only a non-interactive `just exec <cmd>` (which does not read
+`.bashrc`) needs `source /opt/ros/${ROS_DISTRO}/setup.bash` first.
 
 ## 4. Visualize (GUI)
 
 ```bash
-realsense-viewer    # librealsense GUI; the container's GUI mode + X11 mounts handle display
+realsense-viewer    # librealsense GUI
+rviz2               # ROS 2 visualization
 ```
 
-This is a `ros-base` image, so `rviz2` is not installed. Use `realsense-viewer`,
-or install rviz yourself: `sudo apt install -y ros-${ROS_DISTRO}-rviz2` (the
-container has passwordless sudo).
+The devel image installs `ros-${ROS_DISTRO}-desktop`, so both `realsense-viewer`
+and `rviz2` (plus the Qt/OpenGL/X stack they need) are available. The container's
+GUI mode + X11 mounts handle the display.
 
 ## Troubleshooting
 
 | Symptom | Check |
 |---|---|
 | `No device detected` | Host `lsusb` sees the camera? cable / USB 3.0 port / not held by another process. Container is `privileged` (default). |
-| `ros2: command not found` in a `just exec` shell | `source /opt/ros/${ROS_DISTRO}/setup.bash` (the `just run` shell sources it via the entrypoint). |
+| `ros2: command not found` | Interactive shells auto-source ROS via `~/.bashrc.d`. Only a non-interactive `just exec <cmd>` needs `source /opt/ros/${ROS_DISTRO}/setup.bash` first. |
 | `realsense-viewer` will not open (X11) | Host has an X server; `echo $DISPLAY` is set; GUI mode is `[gui] mode = auto` in `config/docker/setup.conf`. |
