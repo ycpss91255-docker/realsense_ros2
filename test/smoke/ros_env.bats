@@ -31,6 +31,19 @@ setup() {
     assert_success
 }
 
+@test "RealSense SDK tools load their shared libraries (rs-enumerate-devices)" {
+    # ros-${ROS_DISTRO}-librealsense2 (a dependency of realsense2-camera) ships
+    # the SDK CLI tools (rs-enumerate-devices, realsense-viewer, rs-*) under
+    # /opt/ros/${ROS_DISTRO}/bin. They need ROS sourced for PATH +
+    # LD_LIBRARY_PATH. With no camera attached the tool reports "No device
+    # detected" and exits 0; a missing tool or unresolvable shared library
+    # fails (exit 127, "error while loading shared libraries"). This guards
+    # that the tools are actually usable, not just present on disk.
+    run bash -c "source /opt/ros/${ROS_DISTRO}/setup.bash && rs-enumerate-devices"
+    refute_output --partial "error while loading shared libraries"
+    assert_success
+}
+
 # -------------------- Base tools --------------------
 
 @test "git is available" {
