@@ -1,10 +1,10 @@
 **[English](../README.md)** | **[繁體中文](README.zh-TW.md)** | **[简体中文](README.zh-CN.md)** | **[日本語](README.ja.md)**
 
-# Intel RealSense Docker 容器（ROS 2 Humble）
+# Intel RealSense Docker 容器（ROS 2）
 
-[![CI](https://github.com/ycpss91255-docker/realsense_humble/actions/workflows/main.yaml/badge.svg)](https://github.com/ycpss91255-docker/realsense_humble/actions/workflows/main.yaml) [![License](https://img.shields.io/badge/License-Apache--2.0-blue?style=flat-square)](../LICENSE)
+[![CI](https://github.com/ycpss91255-docker/realsense_ros2/actions/workflows/main.yaml/badge.svg)](https://github.com/ycpss91255-docker/realsense_ros2/actions/workflows/main.yaml) [![License](https://img.shields.io/badge/License-Apache--2.0-blue?style=flat-square)](../LICENSE)
 
-> **TL;DR** — 容器化的 Intel RealSense ROS 2 Humble 驅動程式。透過 apt 安裝 `realsense2_camera` 和 `librealsense2`，內含 udev 規則以存取裝置。
+> **TL;DR** — 容器化的 Intel RealSense ROS 2 驅動程式。透過 apt 安裝 `realsense2_camera` 和 `librealsense2`，內含 udev 規則以存取裝置。
 >
 > ```bash
 > ./build.sh && ./run.sh
@@ -77,7 +77,7 @@ docker compose --profile test build test
 | 變數 | 說明 | 範例 |
 |------|------|------|
 | `DOCKER_HUB_USER` | Docker Hub 使用者名稱 | `myuser` |
-| `IMAGE_NAME` | 映像檔名稱 | `realsense_humble` |
+| `IMAGE_NAME` | 映像檔名稱 | `realsense_ros2` |
 
 ### RealSense udev 規則
 
@@ -121,14 +121,13 @@ graph TD
 ## 目錄結構
 
 ```text
-realsense_humble/
+realsense_ros2/
 ├── compose.yaml                 # Docker Compose 定義
 ├── Dockerfile                   # 多階段建置
 ├── build.sh                     # 建置腳本
 ├── run.sh                       # 執行腳本
 ├── exec.sh                      # 進入執行中的容器
 ├── stop.sh                      # 停止並移除容器
-├── .env.example                 # 環境變數範本
 ├── .hadolint.yaml               # Hadolint 忽略規則
 ├── script/
 │   └── entrypoint.sh            # 容器進入點

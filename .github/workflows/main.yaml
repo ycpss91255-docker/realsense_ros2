@@ -18,7 +18,7 @@ jobs:
       contents: read
     uses: ycpss91255-docker/base/.github/workflows/build-worker.yaml@v0.41.0
     with:
-      image_name: realsense_humble
+      image_name: realsense_ros2
       build_args: |
         ROS_DISTRO=humble
         ROS_TAG=ros-base
@@ -31,5 +31,5 @@ jobs:
       contents: write
     uses: ycpss91255-docker/base/.github/workflows/release-worker.yaml@v0.41.0
     with:
-      archive_name_prefix: realsense_humble
+      archive_name_prefix: realsense_ros2
     secrets: inherit
