@@ -31,6 +31,20 @@ setup() {
     assert_success
 }
 
+@test "RealSense SDK tool libraries resolve (rs-enumerate-devices)" {
+    # ros-${ROS_DISTRO}-librealsense2 (a dependency of realsense2-camera) ships
+    # the SDK CLI tools (rs-enumerate-devices, realsense-viewer, rs-*) under
+    # /opt/ros/${ROS_DISTRO}/bin. They need ROS sourced for LD_LIBRARY_PATH.
+    # ldd the binary to prove its shared libraries (librealsense2.so.*, ...)
+    # all resolve -- camera-independent, so it behaves the same in CI (no
+    # device) and on a dev box. A packaging / lib-path regression surfaces as
+    # an unresolved "not found". (Running the tool itself is avoided: with no
+    # camera it exits non-zero, which is not a load failure.)
+    run bash -c "source /opt/ros/${ROS_DISTRO}/setup.bash && ldd /opt/ros/${ROS_DISTRO}/bin/rs-enumerate-devices"
+    assert_success
+    refute_output --partial "not found"
+}
+
 # -------------------- Base tools --------------------
 
 @test "git is available" {

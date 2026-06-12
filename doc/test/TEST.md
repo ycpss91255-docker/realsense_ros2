@@ -1,6 +1,6 @@
 # TEST.md
 
-**57 tests** total.
+**58 tests** total.
 
 ## test/smoke/ros_env.bats
 
@@ -12,12 +12,13 @@
 | `ROS 2 setup.bash exists` | `/opt/ros/${ROS_DISTRO}/setup.bash` exists |
 | `ROS 2 setup.bash can be sourced` | ROS 2 setup script sources without error |
 
-### RealSense packages (2)
+### RealSense packages (3)
 
 | Test | Description |
 |------|-------------|
 | `realsense2_camera is installed` | `ros-${ROS_DISTRO}-realsense2-camera` package installed |
 | `realsense2_description is installed` | `ros-${ROS_DISTRO}-realsense2-description` package installed |
+| `RealSense SDK tool libraries resolve (rs-enumerate-devices)` | SDK CLI tool's shared libraries (librealsense2.so) all resolve via ldd with ROS sourced |
 
 ### Base tools (4)
 
