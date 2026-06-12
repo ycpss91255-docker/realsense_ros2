@@ -64,6 +64,19 @@ setup() {
     assert [ -d "${HOME}" ]
 }
 
+@test "container user matches the configured USER_NAME (base v0.41.0 build contract)" {
+    # Regression guard: the Dockerfile must consume the USER_NAME / USER_UID /
+    # USER_GROUP / USER_GID build-args that base v0.41.0's compose + CI inject.
+    # If it falls back to the legacy default user, the container HOME diverges
+    # from compose's /home/${USER_NAME}/work mount and `just run` breaks.
+    assert [ -n "${CONTAINER_EXPECTED_USER}" ]
+    assert_equal "$(id -un)" "${CONTAINER_EXPECTED_USER}"
+}
+
+@test "HOME path matches the container user" {
+    assert_equal "${HOME}" "/home/$(id -un)"
+}
+
 @test "Timezone is Asia/Taipei" {
     run cat /etc/timezone
     assert_output "Asia/Taipei"
