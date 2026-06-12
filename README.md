@@ -154,7 +154,8 @@ graph TD
 
 ## Smoke Tests
 
-See [TEST.md](doc/test/TEST.md) for details.
+See [TEST.md](doc/test/TEST.md) for the automatic build-time tests, and
+[CAMERA.md](doc/test/CAMERA.md) for testing with a physical camera.
 
 ## Directory Structure
 
@@ -186,7 +187,9 @@ realsense_ros2/
 │   ├── README.zh-CN.md          # Simplified Chinese
 │   ├── README.ja.md             # Japanese
 │   ├── changelog/CHANGELOG.md
-│   └── test/TEST.md
+│   └── test/
+│       ├── TEST.md             # automatic build-time smoke tests
+│       └── CAMERA.md           # manual testing with a physical camera
 ├── .github/workflows/
 │   └── main.yaml                # CI (calls base reusable build/release workers)
 └── test/

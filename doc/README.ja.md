@@ -153,7 +153,7 @@ graph TD
 
 ## Smoke Tests
 
-詳細は [TEST.md](test/TEST.md) を参照。
+ビルド時の自動テストは [TEST.md](test/TEST.md)、実機カメラでのテストは [CAMERA.md](test/CAMERA.md) を参照。
 
 ## ディレクトリ構成
 
@@ -185,7 +185,9 @@ realsense_ros2/
 │   ├── README.zh-CN.md          # 簡体字中国語
 │   ├── README.ja.md             # 日本語
 │   ├── changelog/CHANGELOG.md
-│   └── test/TEST.md
+│   └── test/
+│       ├── TEST.md             # ビルド時の自動 smoke テスト
+│       └── CAMERA.md           # 実機カメラでの手動テスト
 ├── .github/workflows/
 │   └── main.yaml                # CI（base の再利用可能な build/release ワーカーを呼び出す）
 └── test/
