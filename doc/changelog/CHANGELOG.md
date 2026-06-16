@@ -21,6 +21,8 @@ versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   kept and documented: hardware testing confirmed the full D455 feature set
   needs it (V4L2 needs the whole dynamically-renumbered `/dev`; the HID/IIO IMU
   needs writable `/sys` + AppArmor-unconfined + a dynamic iio-major device).
+  Rationale recorded in `doc/adr/00000001-realsense-requires-privileged.md`
+  (this repo's first ADR).
 - revert display mount to XDG_RUNTIME_DIR:rw
 - use tmpfs for XDG_RUNTIME_DIR + Wayland socket mount
 

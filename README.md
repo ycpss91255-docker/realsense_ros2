@@ -186,6 +186,7 @@ realsense_ros2/
 │   ├── README.zh-TW.md          # Traditional Chinese
 │   ├── README.zh-CN.md          # Simplified Chinese
 │   ├── README.ja.md             # Japanese
+│   ├── adr/                     # Architecture Decision Records
 │   ├── changelog/CHANGELOG.md
 │   └── test/
 │       ├── TEST.md             # automatic build-time smoke tests

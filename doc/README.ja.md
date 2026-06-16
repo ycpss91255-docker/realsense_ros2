@@ -184,6 +184,7 @@ realsense_ros2/
 │   ├── README.zh-TW.md          # 繁体字中国語
 │   ├── README.zh-CN.md          # 簡体字中国語
 │   ├── README.ja.md             # 日本語
+│   ├── adr/                     # アーキテクチャ決定記録（ADR）
 │   ├── changelog/CHANGELOG.md
 │   └── test/
 │       ├── TEST.md             # ビルド時の自動 smoke テスト

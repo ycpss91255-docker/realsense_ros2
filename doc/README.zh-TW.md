@@ -182,6 +182,7 @@ realsense_ros2/
 │   ├── README.zh-TW.md          # 繁體中文
 │   ├── README.zh-CN.md          # 簡體中文
 │   ├── README.ja.md             # 日文
+│   ├── adr/                     # 架構決策記錄（ADR）
 │   ├── changelog/CHANGELOG.md
 │   └── test/
 │       ├── TEST.md             # 建置期自動 smoke 測試
