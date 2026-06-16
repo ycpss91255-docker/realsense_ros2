@@ -196,6 +196,7 @@ realsense_ros2/
 │   ├── README.zh-TW.md          # 繁體中文
 │   ├── README.zh-CN.md          # 簡體中文
 │   ├── README.ja.md             # 日文
+│   ├── adr/                     # 架構決策記錄（ADR）
 │   ├── CAMERA.md               # 實機相機手動測試
 │   ├── CALIBRATION.md          # 動態校正工具說明
 │   ├── changelog/CHANGELOG.md

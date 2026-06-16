@@ -204,6 +204,7 @@ realsense_ros2/
 │   ├── README.zh-TW.md          # Traditional Chinese
 │   ├── README.zh-CN.md          # Simplified Chinese
 │   ├── README.ja.md             # Japanese
+│   ├── adr/                     # Architecture Decision Records
 │   ├── CAMERA.md               # manual testing with a physical camera
 │   ├── CALIBRATION.md          # Dynamic Calibration Tool guide
 │   ├── changelog/CHANGELOG.md
