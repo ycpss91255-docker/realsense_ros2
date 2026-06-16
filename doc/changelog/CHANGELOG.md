@@ -13,6 +13,14 @@ versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   repos.
 
 ### Fixed
+- `config/docker/setup.conf`: remove the dead `cap_add`
+  (`SYS_ADMIN`/`NET_ADMIN`/`MKNOD`) and `security_opt` (`seccomp:unconfined`)
+  entries -- under `privileged=true` they are no-ops (#70). Move `/dev` from a
+  `[devices]` snapshot to a `[volumes]` live bind so hot-plug / firmware-DFU
+  re-enumeration is visible without a container restart. `privileged=true` is
+  kept and documented: hardware testing confirmed the full D455 feature set
+  needs it (V4L2 needs the whole dynamically-renumbered `/dev`; the HID/IIO IMU
+  needs writable `/sys` + AppArmor-unconfined + a dynamic iio-major device).
 - revert display mount to XDG_RUNTIME_DIR:rw
 - use tmpfs for XDG_RUNTIME_DIR + Wayland socket mount
 
