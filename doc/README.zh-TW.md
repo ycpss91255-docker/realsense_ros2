@@ -102,7 +102,20 @@ docker compose --profile test build test
 
 ### RealSense udev 規則
 
-容器包含位於 `/etc/udev/rules.d/99-realsense-libusb.rules` 的 udev 規則，用於 RealSense USB 裝置存取。容器以 `privileged` 模式執行，並掛載 `/dev`。
+udev 規則必須裝在 **host**，而不只是容器內。容器沒有 `udevd`，而裝置節點的權限
+位於透過 `/dev` bind mount 共享的 host `devtmpfs` inode 上，所以映像內建的那份規則
+本身不會生效。少了 host 規則，容器內的非 root 使用者就無法開啟 raw USB 節點，SDK 會
+誤判相機（回報 USB 2.0、`Product Line not supported`，或韌體更新失敗）。詳見
+[IntelRealSense/librealsense#12022](https://github.com/IntelRealSense/librealsense/issues/12022)。
+
+用內附腳本在 host 上安裝一次即可（會使用 `sudo`）：
+
+```bash
+./script/install_udev_rules.sh
+```
+
+腳本會把 `config/realsense/99-realsense-libusb.rules` 複製到 `/etc/udev/rules.d/`
+並重新載入 udev，之後請重新插拔相機。容器本身以 `privileged` 模式執行並掛載 `/dev`。
 
 ## 架構
 
@@ -142,7 +155,7 @@ graph TD
 | `bats-extensions` | `alpine:3.21` | bats-support、bats-assert，不出貨 |
 | `lint-tools` | `alpine:3.21` | ShellCheck + Hadolint，不出貨 |
 | `sys` | `ros:humble-ros-base-jammy` | 共用基底：使用者、locale、時區（base v0.41.0 build contract） |
-| `devel-base` | `sys` | 開發工具 + RealSense 套件 |
+| `devel-base` | `sys` | 開發工具 + RealSense 套件 + Dynamic Calibration Tool（amd64） |
 | `devel` | `devel-base` | 出貨的開發映像（預設 CMD `bash`） |
 | `devel-test` | `devel` | Lint + smoke tests，建置後丟棄（暫時性） |
 | `runtime-base` | `sys` | 最小基底（`sudo`、`tini`） |
@@ -151,7 +164,7 @@ graph TD
 
 ## Smoke Tests
 
-建置期自動測試詳見 [TEST.md](test/TEST.md)；實機相機測試見 [CAMERA.md](test/CAMERA.md)。
+建置期自動測試詳見 [TEST.md](test/TEST.md)；實機相機測試見 [CAMERA.md](CAMERA.md)；動態校正工具見 [CALIBRATION.md](CALIBRATION.md)。
 
 ## 目錄結構
 
@@ -165,6 +178,7 @@ realsense_ros2/
 ├── .base/                       # base subtree（唯讀；v0.41.0）
 ├── script/
 │   ├── entrypoint.sh            # 容器進入點（repo 自有）
+│   ├── install_udev_rules.sh    # 在 host 安裝 RealSense udev 規則（repo 自有）
 │   ├── build.sh -> ../.base/script/docker/wrapper/build.sh   # symlink
 │   ├── run.sh   -> ../.base/script/docker/wrapper/run.sh     # symlink
 │   ├── exec.sh  -> ../.base/script/docker/wrapper/exec.sh    # symlink
@@ -183,10 +197,11 @@ realsense_ros2/
 │   ├── README.zh-CN.md          # 簡體中文
 │   ├── README.ja.md             # 日文
 │   ├── adr/                     # 架構決策記錄（ADR）
+│   ├── CAMERA.md               # 實機相機手動測試
+│   ├── CALIBRATION.md          # 動態校正工具說明
 │   ├── changelog/CHANGELOG.md
 │   └── test/
-│       ├── TEST.md             # 建置期自動 smoke 測試
-│       └── CAMERA.md           # 實機相機手動測試
+│       └── TEST.md             # 建置期自動 smoke 測試
 ├── .github/workflows/
 │   └── main.yaml                # CI（呼叫 base 的 reusable build/release worker）
 └── test/

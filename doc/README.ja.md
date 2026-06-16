@@ -104,7 +104,23 @@ docker compose --profile test build test
 
 ### RealSense udev ルール
 
-コンテナには `/etc/udev/rules.d/99-realsense-libusb.rules` に udev ルールが含まれており、RealSense USB デバイスへのアクセスを提供します。コンテナは `privileged` モードで実行され、`/dev` がマウントされます。
+udev ルールはコンテナ内だけでなく **ホスト** にインストールする必要があります。
+コンテナには `udevd` がなく、デバイスノードの権限は `/dev` bind mount で共有される
+ホストの `devtmpfs` inode 上にあるため、イメージに焼き込まれたルールだけでは機能
+しません。ホストのルールがないと、コンテナ内の非 root ユーザーは raw USB ノードを
+開けず、SDK がカメラを誤検出します（USB 2.0、`Product Line not supported` を報告、
+またはファームウェア更新に失敗）。[IntelRealSense/librealsense#12022](https://github.com/IntelRealSense/librealsense/issues/12022)
+を参照してください。
+
+付属スクリプトでホストに一度だけインストールします（`sudo` を使用）：
+
+```bash
+./script/install_udev_rules.sh
+```
+
+スクリプトは `config/realsense/99-realsense-libusb.rules` を `/etc/udev/rules.d/`
+にコピーして udev をリロードします。その後カメラを再接続してください。コンテナ自体は
+`privileged` モードで実行され、`/dev` がマウントされます。
 
 ## アーキテクチャ
 
@@ -144,7 +160,7 @@ graph TD
 | `bats-extensions` | `alpine:3.21` | bats-support、bats-assert、出荷しない |
 | `lint-tools` | `alpine:3.21` | ShellCheck + Hadolint、出荷しない |
 | `sys` | `ros:humble-ros-base-jammy` | 共通ベース：ユーザー、ロケール、タイムゾーン（base v0.41.0 build contract） |
-| `devel-base` | `sys` | 開発ツール + RealSense パッケージ |
+| `devel-base` | `sys` | 開発ツール + RealSense パッケージ + Dynamic Calibration Tool（amd64） |
 | `devel` | `devel-base` | 出荷する開発イメージ（デフォルト CMD `bash`） |
 | `devel-test` | `devel` | Lint + smoke tests、ビルド後に破棄（一時的） |
 | `runtime-base` | `sys` | 最小ベース（`sudo`、`tini`） |
@@ -153,7 +169,7 @@ graph TD
 
 ## Smoke Tests
 
-ビルド時の自動テストは [TEST.md](test/TEST.md)、実機カメラでのテストは [CAMERA.md](test/CAMERA.md) を参照。
+ビルド時の自動テストは [TEST.md](test/TEST.md)、実機カメラでのテストは [CAMERA.md](CAMERA.md)、動的キャリブレーションツールは [CALIBRATION.md](CALIBRATION.md) を参照。
 
 ## ディレクトリ構成
 
@@ -167,6 +183,7 @@ realsense_ros2/
 ├── .base/                       # base サブツリー（読み取り専用；v0.41.0）
 ├── script/
 │   ├── entrypoint.sh            # コンテナエントリポイント（リポジトリ所有）
+│   ├── install_udev_rules.sh    # ホストに RealSense udev ルールをインストール（リポジトリ所有）
 │   ├── build.sh -> ../.base/script/docker/wrapper/build.sh   # シンボリックリンク
 │   ├── run.sh   -> ../.base/script/docker/wrapper/run.sh     # シンボリックリンク
 │   ├── exec.sh  -> ../.base/script/docker/wrapper/exec.sh    # シンボリックリンク
@@ -185,10 +202,11 @@ realsense_ros2/
 │   ├── README.zh-CN.md          # 簡体字中国語
 │   ├── README.ja.md             # 日本語
 │   ├── adr/                     # アーキテクチャ決定記録（ADR）
+│   ├── CAMERA.md               # 実機カメラでの手動テスト
+│   ├── CALIBRATION.md          # 動的キャリブレーションツール解説
 │   ├── changelog/CHANGELOG.md
 │   └── test/
-│       ├── TEST.md             # ビルド時の自動 smoke テスト
-│       └── CAMERA.md           # 実機カメラでの手動テスト
+│       └── TEST.md             # ビルド時の自動 smoke テスト
 ├── .github/workflows/
 │   └── main.yaml                # CI（base の再利用可能な build/release ワーカーを呼び出す）
 └── test/

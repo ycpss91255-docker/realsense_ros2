@@ -6,11 +6,32 @@ versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ## [Unreleased]
 
 ### Added
+- Bundle the Intel RealSense D400 Series Dynamic Calibration Tool
+  (`librscalibrationtool`) in the `devel` image, pulled from Intel's librealsense
+  apt repo in the `devel-base` stage (amd64-only; skipped on other architectures).
+  Provides `Intel.Realsense.DynamicCalibrator` / `Intel.Realsense.CustomRW` for
+  target-based extrinsic calibration (rectification, depth scale, and the RGB
+  extrinsics on RGB devices). Documented in
+  the new `doc/CALIBRATION.md` (linked from `README.md` + 3 translated READMEs).
+- `script/install_udev_rules.sh`: one-shot installer that copies the bundled
+  RealSense udev rules to the **host** `/etc/udev/rules.d/` and reloads udev.
+  The in-image rules alone are not enough (the container has no `udevd`); without
+  the host rules the non-root container user cannot open the raw USB node and the
+  SDK misdetects the camera (USB 2.0 / `Product Line not supported` / firmware
+  update failures, see IntelRealSense/librealsense#12022). Documented in
+  `README.md` + 3 translated READMEs; covered by `test/smoke/install_udev_rules.bats`.
 - `LICENSE` (Apache 2.0) and CI / License badges in
   `README.md` + 3 translated READMEs (#41). Fresh add
   -- repo previously had no LICENSE and no badges. Aligns with
   the org-wide Apache 2.0 migration tracked across 17 sister
   repos.
+
+### Changed
+- Move `CAMERA.md` from `doc/test/` to `doc/` (it documents manual physical-camera
+  use, not build-time tests); README links + directory trees updated in 4 languages.
+- Add an "On-chip calibration" section to `doc/CAMERA.md` covering the
+  realsense-viewer workflow and how to read the health-check score (absolute value
+  vs the 0.25 threshold; sign is direction, not pass/fail).
 
 ### Fixed
 - `config/docker/setup.conf`: remove the dead `cap_add`

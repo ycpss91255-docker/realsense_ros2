@@ -63,6 +63,45 @@ The devel image installs `ros-${ROS_DISTRO}-desktop`, so both `realsense-viewer`
 and `rviz2` (plus the Qt/OpenGL/X stack they need) are available. The container's
 GUI mode + X11 mounts handle the display.
 
+## 5. On-chip calibration (optional)
+
+The D400 series can re-calibrate its stereo depth parameters from a normal scene
+-- no calibration target needed. Depth is computed by stereo-matching the two IR
+cameras, and the factory parameters drift over time (temperature, mechanical
+shock, transport, ageing), which shows up as extra depth noise, non-flat planes,
+or noisy edges. On-chip calibration corrects that drift. It is independent of a
+firmware update: firmware changes the camera's firmware version, calibration
+adjusts the depth-measurement parameters. Running it once after a firmware update
+is a good sanity check.
+
+Run it from `realsense-viewer`: open the depth sensor's **More** menu and pick
+**On-Chip Calibration**, then point at a suitable scene and press calibrate.
+
+Scene requirements:
+
+- Textured, **0.5--2 m** away, with **> 50% valid depth pixels** (avoid a blank
+  wall, highly reflective surfaces, or anything too far).
+- The "White wall" sub-mode is the exception: use it **only** when pointing at a
+  flat white wall with the IR projector on.
+
+### Reading the health-check score
+
+After calibrating, the viewer reports a health-check score. **What matters is its
+absolute value** -- the sign only encodes the direction of the correction, not
+"better" or "worse". The viewer's `if >0.25` guidance means `|health| > 0.25`.
+
+| `|health|` | Meaning | Action |
+|---|---|---|
+| near 0 (< 0.25) | Already well calibrated; this run barely changed anything | No need to apply |
+| >= 0.25 | Noticeable drift; the correction is meaningful | Apply the new calibration |
+| large (e.g. > 0.75) | Heavy drift, or an unsuitable scene | Apply, then re-run on a better scene to confirm |
+
+So a score of `-0.45` is `|0.45| > 0.25`: meaningful drift was detected, and
+applying the new calibration is recommended. A negative sign does **not** mean
+the calibration failed. After applying, check the depth image in
+`realsense-viewer` (flatter planes, less noise); to be safe, re-run on a
+different scene -- a score back near 0 means the calibration has converged.
+
 ## Troubleshooting
 
 | Symptom | Check |
