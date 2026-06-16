@@ -1,6 +1,6 @@
 # TEST.md
 
-**61 tests** total.
+**64 tests** total.
 
 ## test/smoke/ros_env.bats
 
@@ -56,6 +56,16 @@
 | Test | Description |
 |------|-------------|
 | `Work directory exists` | `${HOME}/work` directory exists |
+
+## test/smoke/install_udev_rules.bats
+
+### install_udev_rules.sh (3)
+
+| Test | Description |
+|------|-------------|
+| `install_udev_rules.sh -h exits 0` | Help exits successfully |
+| `install_udev_rules.sh --help exits 0` | Help exits successfully |
+| `install_udev_rules.sh -h prints usage` | Help output contains "Usage:" |
 
 ## .base/test/smoke/script_help.bats
 

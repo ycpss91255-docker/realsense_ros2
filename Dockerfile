@@ -97,6 +97,7 @@ RUN sed -i "s@archive.ubuntu.com@${APT_MIRROR_UBUNTU}@g" /etc/apt/sources.list |
 FROM sys AS devel-base
 
 ARG ROS_DISTRO
+ARG UBUNTU_CODENAME
 
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
@@ -132,6 +133,34 @@ RUN apt-get update && \
         && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
+
+# Intel RealSense D400 Series Dynamic Calibration Tool (librscalibrationtool).
+# Not in the ROS apt repo, so pull it from Intel's librealsense apt repo. The
+# package is amd64-only and self-contained (no Depends on Intel's librealsense2),
+# so it does not clash with the ROS-provided librealsense. Non-amd64 (e.g. ARM64)
+# is skipped -- Intel ships no build there -- so the multi-arch image still builds.
+# The deb declares no Depends, so its runtime libs are added explicitly
+# (freeglut3 -> libglut.so.3). The repo is signed by key FB0B24895113F120; Intel's
+# published librealsense.pgp still carries only the old C8B3A55A6F3EFCDE key, so
+# fetch the current key from the Ubuntu keyserver (apt on jammy accepts an armored
+# signed-by keyring, so no gnupg is needed at build time).
+ARG RS_APT_KEY="FB0B24895113F120"
+RUN arch="$(dpkg --print-architecture)" && \
+    if [ "${arch}" = "amd64" ]; then \
+        install -m 0755 -d /etc/apt/keyrings && \
+        curl -fsSL "https://keyserver.ubuntu.com/pks/lookup?op=get&search=0x${RS_APT_KEY}" \
+            -o /etc/apt/keyrings/librealsense.asc && \
+        echo "deb [signed-by=/etc/apt/keyrings/librealsense.asc] https://librealsense.intel.com/Debian/apt-repo ${UBUNTU_CODENAME} main" \
+            > /etc/apt/sources.list.d/librealsense.list && \
+        apt-get update && \
+        apt-get install -y --no-install-recommends \
+            librscalibrationtool \
+            freeglut3 && \
+        apt-get clean && \
+        rm -rf /var/lib/apt/lists/*; \
+    else \
+        echo "Skipping librscalibrationtool: not available for ${arch}"; \
+    fi
 
 ############################## devel ##############################
 FROM devel-base AS devel

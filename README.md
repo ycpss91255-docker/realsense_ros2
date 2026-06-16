@@ -105,7 +105,23 @@ runtime keys (`gpu_mode`, `gpu_count`, `gpu_capabilities`, `gpu_runtime`), and
 
 ### RealSense udev Rules
 
-The container includes udev rules at `/etc/udev/rules.d/99-realsense-libusb.rules` for RealSense USB device access. The container runs in `privileged` mode with `/dev` mounted.
+The udev rules must be installed on the **host**, not just inside the container.
+The container has no `udevd`, and a device node's permissions live on the host
+`devtmpfs` inode shared through the `/dev` bind mount, so the in-image copy of
+the rules does nothing on its own. Without the host rules the non-root container
+user cannot open the raw USB node and the SDK misdetects the camera (reports USB
+2.0, `Product Line not supported`, or fails firmware updates). See
+[IntelRealSense/librealsense#12022](https://github.com/IntelRealSense/librealsense/issues/12022).
+
+Install them once on the host with the bundled script (uses `sudo`):
+
+```bash
+./script/install_udev_rules.sh
+```
+
+It copies `config/realsense/99-realsense-libusb.rules` to `/etc/udev/rules.d/`
+and reloads udev. Re-plug the camera afterwards. The container itself runs in
+`privileged` mode with `/dev` mounted.
 
 ## Architecture
 
@@ -145,7 +161,7 @@ graph TD
 | `bats-extensions` | `alpine:3.21` | bats-support, bats-assert, not shipped |
 | `lint-tools` | `alpine:3.21` | ShellCheck + Hadolint, not shipped |
 | `sys` | `ros:humble-ros-base-jammy` | Common base: user, locale, timezone (base v0.41.0 build contract) |
-| `devel-base` | `sys` | Dev tools + RealSense packages |
+| `devel-base` | `sys` | Dev tools + RealSense packages + Dynamic Calibration Tool (amd64) |
 | `devel` | `devel-base` | Shipped dev image (default CMD `bash`) |
 | `devel-test` | `devel` | Lint + smoke tests, discarded after build (ephemeral) |
 | `runtime-base` | `sys` | Minimal base (`sudo`, `tini`) |
@@ -155,7 +171,8 @@ graph TD
 ## Smoke Tests
 
 See [TEST.md](doc/test/TEST.md) for the automatic build-time tests, and
-[CAMERA.md](doc/test/CAMERA.md) for testing with a physical camera.
+[CAMERA.md](doc/CAMERA.md) for testing with a physical camera, and
+[CALIBRATION.md](doc/CALIBRATION.md) for the Dynamic Calibration Tool.
 
 ## Directory Structure
 
@@ -169,6 +186,7 @@ realsense_ros2/
 ├── .base/                       # base subtree (read-only; v0.41.0)
 ├── script/
 │   ├── entrypoint.sh            # Container entrypoint (repo-owned)
+│   ├── install_udev_rules.sh    # Install RealSense udev rules on the host (repo-owned)
 │   ├── build.sh -> ../.base/script/docker/wrapper/build.sh   # symlink
 │   ├── run.sh   -> ../.base/script/docker/wrapper/run.sh     # symlink
 │   ├── exec.sh  -> ../.base/script/docker/wrapper/exec.sh    # symlink
@@ -186,10 +204,11 @@ realsense_ros2/
 │   ├── README.zh-TW.md          # Traditional Chinese
 │   ├── README.zh-CN.md          # Simplified Chinese
 │   ├── README.ja.md             # Japanese
+│   ├── CAMERA.md               # manual testing with a physical camera
+│   ├── CALIBRATION.md          # Dynamic Calibration Tool guide
 │   ├── changelog/CHANGELOG.md
 │   └── test/
-│       ├── TEST.md             # automatic build-time smoke tests
-│       └── CAMERA.md           # manual testing with a physical camera
+│       └── TEST.md             # automatic build-time smoke tests
 ├── .github/workflows/
 │   └── main.yaml                # CI (calls base reusable build/release workers)
 └── test/
