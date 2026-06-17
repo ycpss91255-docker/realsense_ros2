@@ -56,7 +56,7 @@ RUN if getent group "${GID}" >/dev/null; then \
             groupmod -n "${GROUP}" "${existing_grp}"; \
         fi; \
     else \
-        groupadd -g "${GID}" "${USER}"; \
+        groupadd -g "${GID}" "${GROUP}"; \
     fi; \
     \
     if getent passwd "${UID}" >/dev/null; then \
@@ -307,7 +307,7 @@ ARG RUNTIME_SMOKE_CMD='whoami && bash --version && \
   source /opt/ros/${ROS_DISTRO}/setup.bash && \
   rs_dir="/opt/ros/${ROS_DISTRO}/lib/realsense2_camera" && \
   test -d "${rs_dir}" && \
-  bins="$(find "${rs_dir}" -maxdepth 1 -type f)" && \
+  bins="$(find "${rs_dir}" -maxdepth 1 \( -type f -o -type l \))" && \
   test -n "${bins}" && \
   for f in ${bins}; do \
     echo "--- ldd: ${f} ---"; ldd "${f}" || true; \

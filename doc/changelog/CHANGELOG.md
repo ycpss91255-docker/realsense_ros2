@@ -44,6 +44,13 @@ versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   needs writable `/sys` + AppArmor-unconfined + a dynamic iio-major device).
   Rationale recorded in `doc/adr/00000001-realsense-requires-privileged.md`
   (this repo's first ADR).
+- `Dockerfile`: the new-group branch now runs `groupadd -g ${GID} ${GROUP}`
+  instead of `${USER}`, so the created group is named after `USER_GROUP` rather
+  than the user; previously harmless only because `USER == GROUP` by default,
+  a real bug once they differ. The `runtime-test` ldd smoke now finds
+  `-type f -o -type l`, so a packaged tool/lib shipped as a symlink to a
+  versioned `.so` is ldd-checked too (#71). Guarded by
+  `test/smoke/dockerfile_guards.bats`.
 - revert display mount to XDG_RUNTIME_DIR:rw
 - use tmpfs for XDG_RUNTIME_DIR + Wayland socket mount
 
