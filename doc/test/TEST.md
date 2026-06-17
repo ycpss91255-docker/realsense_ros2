@@ -1,6 +1,6 @@
 # TEST.md
 
-**64 tests** total.
+**66 tests** total.
 
 ## test/smoke/ros_env.bats
 
@@ -66,6 +66,15 @@
 | `install_udev_rules.sh -h exits 0` | Help exits successfully |
 | `install_udev_rules.sh --help exits 0` | Help exits successfully |
 | `install_udev_rules.sh -h prints usage` | Help output contains "Usage:" |
+
+## test/smoke/dockerfile_guards.bats
+
+### Dockerfile static guards (#71) (2)
+
+| Test | Description |
+|------|-------------|
+| `groupadd new-group branch names the group after ${GROUP}, not ${USER} (#71)` | Dockerfile creates the new group named after USER_GROUP |
+| `runtime-test ldd smoke covers symlinks, not just regular files (#71)` | runtime-test find includes `-type l` so symlinked libs are ldd-checked |
 
 ## .base/test/smoke/script_help.bats
 
