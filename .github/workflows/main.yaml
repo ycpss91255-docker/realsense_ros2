@@ -19,6 +19,8 @@ jobs:
     uses: ycpss91255-docker/base/.github/workflows/build-worker.yaml@v0.41.0
     with:
       image_name: realsense_ros2
+      platforms: linux/amd64,linux/arm64
+      test_tools_version: v0.41.0
       build_args: |
         ROS_DISTRO=humble
         ROS_TAG=ros-base

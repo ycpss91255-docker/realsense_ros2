@@ -1,27 +1,17 @@
 ARG ROS_DISTRO="humble"
 ARG ROS_TAG="ros-base"
 ARG UBUNTU_CODENAME="jammy"
-
-############################## devel-test tool sources ##############################
-FROM bats/bats:1.11.0 AS bats-src
-
-FROM alpine:3.21 AS bats-extensions
-RUN apk add --no-cache git && \
-    git clone --depth 1 -b v0.3.0 \
-        https://github.com/bats-core/bats-support /bats/bats-support && \
-    git clone --depth 1 -b v2.1.0 \
-        https://github.com/bats-core/bats-assert  /bats/bats-assert
-
-FROM alpine:3.21 AS lint-tools
-SHELL ["/bin/ash", "-o", "pipefail", "-c"]
-RUN apk add --no-cache curl xz && \
-    curl -fsSL \
-        https://github.com/koalaman/shellcheck/releases/download/v0.10.0/shellcheck-v0.10.0.linux.x86_64.tar.xz \
-        | tar -xJ -C /tmp && \
-    mv /tmp/shellcheck-v0.10.0/shellcheck /usr/local/bin/shellcheck && \
-    curl -fsSL -o /usr/local/bin/hadolint \
-        https://github.com/hadolint/hadolint/releases/download/v2.12.0/hadolint-Linux-x86_64 && \
-    chmod +x /usr/local/bin/hadolint
+# Pre-built lint + bats tools image (ShellCheck, Hadolint, Bats + the
+# bats-support/assert/mock extensions). Resolves to `test-tools:local` for the
+# local `just build` flow (build.sh auto-builds it from
+# .base/dockerfile/Dockerfile.test-tools) or to the multi-arch
+# ghcr.io/ycpss91255-docker/test-tools:vX.Y.Z in CI. The image is multi-arch,
+# so `FROM ${TEST_TOOLS_IMAGE}` resolves the matching variant per build
+# platform -- that is what lets the arm64 build (#72) ship arm64 lint/bats
+# binaries with no per-repo arch-aware download logic. Consuming this image
+# (instead of self-building the tools) is the template's canonical pattern
+# (Dockerfile.example); see the sibling app/ros1_bridge for the same setup.
+ARG TEST_TOOLS_IMAGE="test-tools:local"
 
 ############################## sys ##############################
 FROM ros:${ROS_DISTRO}-${ROS_TAG}-${UBUNTU_CODENAME} AS sys
@@ -203,13 +193,18 @@ ENTRYPOINT ["/entrypoint.sh"]
 CMD ["bash"]
 
 ############################## devel-test (ephemeral) ##############################
+# Resolves to test-tools:local (local just build) or
+# ghcr.io/ycpss91255-docker/test-tools:vX.Y.Z (CI); see TEST_TOOLS_IMAGE at top.
+# hadolint ignore=DL3006
+FROM ${TEST_TOOLS_IMAGE} AS test-tools-stage
+
 FROM devel AS devel-test
 
 USER root
 
-# Install lint tools
-COPY --from=lint-tools /usr/local/bin/shellcheck /usr/local/bin/shellcheck
-COPY --from=lint-tools /usr/local/bin/hadolint /usr/local/bin/hadolint
+# Install lint tools (from the pre-built multi-arch test-tools image)
+COPY --from=test-tools-stage /usr/local/bin/shellcheck /usr/local/bin/shellcheck
+COPY --from=test-tools-stage /usr/local/bin/hadolint /usr/local/bin/hadolint
 
 # Lint: ShellCheck (.sh) + Hadolint (Dockerfile)
 COPY .hadolint.yaml /lint/.hadolint.yaml
@@ -224,10 +219,10 @@ RUN shellcheck -S warning /lint/*.sh /lint/lib/*.sh
 WORKDIR /lint
 RUN hadolint Dockerfile
 
-# Install bats
-COPY --from=bats-src /opt/bats /opt/bats
-COPY --from=bats-src /usr/lib/bats /usr/lib/bats
-COPY --from=bats-extensions /bats /usr/lib/bats
+# Install bats (the bats-support/assert/mock extensions are already merged
+# into /usr/lib/bats inside the test-tools image)
+COPY --from=test-tools-stage /opt/bats /opt/bats
+COPY --from=test-tools-stage /usr/lib/bats /usr/lib/bats
 RUN ln -sf /opt/bats/bin/bats /usr/local/bin/bats
 
 ENV BATS_LIB_PATH="/usr/lib/bats"
