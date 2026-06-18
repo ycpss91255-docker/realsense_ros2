@@ -34,6 +34,20 @@ versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   vs the 0.25 threshold; sign is direction, not pass/fail).
 
 ### Fixed
+- CI now actually builds **both** `linux/amd64` and `linux/arm64`, making good
+  on the README's long-standing multi-arch claim (previously only amd64 was
+  built despite the claim, #72). Achieved by passing
+  `platforms: linux/amd64,linux/arm64` to the base build-worker (each arch runs
+  on its native runner -- arm64 on `ubuntu-24.04-arm`, no QEMU) and by migrating
+  the `Dockerfile` off its bespoke `bats-src` / `bats-extensions` / `lint-tools`
+  stages onto the template's canonical `COPY --from=${TEST_TOOLS_IMAGE}` pattern
+  (pinned `test_tools_version: v0.41.0`). The pre-built test-tools image is
+  multi-arch, so the lint/bats binaries now match the build platform instead of
+  always being x86_64 -- this is what actually unblocked arm64 (the old
+  hand-rolled `lint-tools` stage hardcoded x86_64 shellcheck/hadolint URLs). The
+  full pipeline (devel-test lint + 66 bats smoke, runtime-test ldd) was verified
+  green on native arm64 hardware (Raspberry Pi 5). The bundled Dynamic
+  Calibration Tool stays amd64-only and is skipped on arm64 as before.
 - `config/docker/setup.conf`: remove the dead `cap_add`
   (`SYS_ADMIN`/`NET_ADMIN`/`MKNOD`) and `security_opt` (`seccomp:unconfined`)
   entries -- under `privileged=true` they are no-ops (#70). Move `/dev` from a
