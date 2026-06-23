@@ -6,6 +6,12 @@ versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ## [Unreleased]
 
 ### Added
+- README **Prerequisites** (install Docker Engine + Compose plugin + `just`; plus
+  host udev rules for a physical camera) and **Uninstall / Cleanup** (`just stop`,
+  `just prune`, host udev-rule removal) sections, in all 4 languages (#85). The
+  prior README assumed the `just` + `docker compose` toolchain was already
+  present and never documented teardown; surfaced bringing the repo up on a fresh
+  arm64 Raspberry Pi (Docker present but no Compose plugin, no `just`).
 - CI now builds a **ROS 2 distro matrix -- Humble (Ubuntu 22.04 jammy) and
   Jazzy (Ubuntu 24.04 noble)** -- from a single Dockerfile, replacing the
   prior Humble-only build (#66). Each matrix entry passes

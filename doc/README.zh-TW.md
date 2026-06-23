@@ -18,8 +18,10 @@ just build && just run
 
 - [概觀](#概觀)
 - [功能特色](#功能特色)
+- [前置需求](#prerequisites)
 - [快速開始](#快速開始)
 - [使用方式](#使用方式)
+- [解除安裝 / 清理](#uninstall--cleanup)
 - [設定](#設定)
 - [架構](#架構)
 - [Smoke Tests](#smoke-tests)
@@ -39,6 +41,41 @@ just build && just run
 - **Docker Compose**：單一 `compose.yaml` 管理所有目標
 - **udev 規則**：預先設定 RealSense USB 裝置存取權限
 - **多架構支援**：支援 x86_64 和 ARM64（RPi、Jetson CPU 模式）
+
+## Prerequisites
+
+使用者進入點是 `just`，由它驅動 Docker。請在 host 上先安裝以下工具一次：
+
+- **Docker Engine + Compose plugin。** wrapper 會呼叫 `docker compose`，因此必須
+  具備 Compose plugin。官方便利腳本會一併安裝 Engine + Buildx + Compose：
+
+  ```bash
+  curl -fsSL https://get.docker.com | sudo sh
+  sudo usermod -aG docker "$USER"   # log out/in so docker runs without sudo
+  ```
+
+  以 `docker compose version` 驗證。（單裝發行版套件可能會少了 Compose --
+  例如只裝 `docker.io` 而沒有 `docker-compose-v2` 時會得到 `docker: unknown command:
+  docker compose`。）
+
+- **just**（命令執行器）。將預編譯的 binary 裝到 `~/.local/bin`，免 sudo：
+
+  ```bash
+  curl --proto '=https' --tlsv1.2 -sSf https://just.systems/install.sh | bash -s -- --to ~/.local/bin
+  ```
+
+  確認 `~/.local/bin` 在 `PATH` 上，然後以 `just --version` 驗證。每個 recipe
+  也都有原始 fallback（`./script/<verb>.sh`），若你不想安裝 `just` 也可使用。
+
+- **（實體相機）host udev 規則。** 若要透過 USB 使用真正的 RealSense，請在 host
+  上安裝內附的規則（見 [RealSense udev 規則](#realsense-udev-rules)）：
+
+  ```bash
+  ./script/install_udev_rules.sh
+  ```
+
+  少了它，容器內的非 root 使用者無法開啟 raw USB 節點，SDK 也會誤判相機 --
+  例如 USB 3 裝置被列舉成 USB 2.1（「Reduced performance expected」）。
 
 ## 快速開始
 
@@ -101,6 +138,25 @@ just build test
 # 或
 docker compose --profile test build test
 ```
+
+## Uninstall / Cleanup
+
+```bash
+just stop      # stop and remove the running containers
+just prune     # remove this repo's images + dangling build cache (see `just prune -h`)
+```
+
+要徹底移除 repo 放在 host 上的東西：
+
+- **映像 / build cache：** `just prune`（或對特定映像用 `docker image rm <tag>`）。
+- **host udev 規則**（僅在你安裝過時）：
+
+  ```bash
+  sudo rm -f /etc/udev/rules.d/99-realsense-libusb.rules
+  sudo udevadm control --reload-rules && sudo udevadm trigger
+  ```
+
+- **repo 本身：** 刪除 clone 下來的目錄。
 
 ## 設定
 

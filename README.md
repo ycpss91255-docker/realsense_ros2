@@ -18,8 +18,10 @@ just build && just run
 
 - [Overview](#overview)
 - [Features](#features)
+- [Prerequisites](#prerequisites)
 - [Quick Start](#quick-start)
 - [Usage](#usage)
+- [Uninstall / Cleanup](#uninstall--cleanup)
 - [Configuration](#configuration)
 - [Architecture](#architecture)
 - [Smoke Tests](#smoke-tests)
@@ -39,6 +41,43 @@ Provides a reproducible ROS 2 environment for Intel RealSense depth cameras. CI 
 - **Docker Compose**: single `compose.yaml` manages all targets
 - **udev rules**: Pre-configured for RealSense USB device access
 - **Multi-arch**: Supports x86_64 and ARM64 (RPi, Jetson CPU mode)
+
+## Prerequisites
+
+The user entry point is `just`, which drives Docker. Install these on the host once:
+
+- **Docker Engine + Compose plugin.** The wrappers call `docker compose`, so the
+  Compose plugin must be present. The official convenience script installs Engine +
+  Buildx + Compose together:
+
+  ```bash
+  curl -fsSL https://get.docker.com | sudo sh
+  sudo usermod -aG docker "$USER"   # log out/in so docker runs without sudo
+  ```
+
+  Verify with `docker compose version`. (Distro packages alone may omit Compose --
+  e.g. `docker.io` without `docker-compose-v2` yields `docker: unknown command:
+  docker compose`.)
+
+- **just** (command runner). Prebuilt binary into `~/.local/bin`, no sudo:
+
+  ```bash
+  curl --proto '=https' --tlsv1.2 -sSf https://just.systems/install.sh | bash -s -- --to ~/.local/bin
+  ```
+
+  Ensure `~/.local/bin` is on `PATH`, then verify with `just --version`. Every recipe
+  also has a raw fallback (`./script/<verb>.sh`) if you prefer not to install `just`.
+
+- **(Physical camera) host udev rules.** To use a real RealSense over USB, install
+  the bundled rules on the host (see [RealSense udev Rules](#realsense-udev-rules)):
+
+  ```bash
+  ./script/install_udev_rules.sh
+  ```
+
+  Without them the non-root container user cannot open the raw USB node and the SDK
+  misdetects the camera -- e.g. a USB 3 device enumerating as USB 2.1 ("Reduced
+  performance expected").
 
 ## Quick Start
 
@@ -102,6 +141,25 @@ just build test
 # or
 docker compose --profile test build test
 ```
+
+## Uninstall / Cleanup
+
+```bash
+just stop      # stop and remove the running containers
+just prune     # remove this repo's images + dangling build cache (see `just prune -h`)
+```
+
+To fully remove what the repo placed on the host:
+
+- **Images / build cache:** `just prune` (or `docker image rm <tag>` for a specific image).
+- **Host udev rules** (only if you installed them):
+
+  ```bash
+  sudo rm -f /etc/udev/rules.d/99-realsense-libusb.rules
+  sudo udevadm control --reload-rules && sudo udevadm trigger
+  ```
+
+- **The repo:** delete the cloned directory.
 
 ## Configuration
 
