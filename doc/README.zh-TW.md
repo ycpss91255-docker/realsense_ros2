@@ -6,11 +6,15 @@
 
 ## TL;DR
 
-容器化的 Intel RealSense ROS 2 驅動程式。透過 apt 安裝 `realsense2-camera` 和 `realsense2-description`（兩者會以相依關係連帶拉入 `librealsense2`），內含 udev 規則以存取裝置。
+容器化的 Intel RealSense ROS 2 相機 **app**：`runtime` 映像的預設指令會 launch 相機節點，並發布即時 **RGB + Depth** topic。透過 apt 安裝 `realsense2-camera` / `realsense2-description`（連帶拉入 `librealsense2`），並內含供 USB 存取的 udev 規則。多發行版（Humble + Jazzy）、多架構（x86_64 + ARM64 / Raspberry Pi）。
 
 ```bash
-just build && just run
+./script/install_udev_rules.sh      # once on the host (physical camera)
+just build && just run -t runtime    # build + launch the camera app
+# -> logs show "RealSense Node Is Up!" and depth/color streaming
 ```
+
+> `just run` 自己只會開 **devel** 開發 shell，不是相機 app -- 要用 `just run -t runtime`。請見 [快速開始](#快速開始)觀看 RGB-D 串流。
 
 ---
 
@@ -80,16 +84,41 @@ just build && just run
 ## 快速開始
 
 ```bash
-# 1. 建置
+# 1. Build (default: ROS 2 Humble)
 just build
 
-# 2. 執行（預設：ros2 launch realsense2_camera rs_launch.py）
-just run
+# 2. (physical camera) install the host udev rules once
+./script/install_udev_rules.sh
 
-# 或直接使用 docker compose
-docker compose up runtime
-docker compose down
+# 3. Launch the camera app. The `runtime` service's default command is
+#    `ros2 launch realsense2_camera rs_launch.py`; foreground shows the node logs:
+just run -t runtime
+#    ...or detached:
+just run -d -t runtime
 ```
+
+### See the RGB-D data
+
+**CLI** -- 確認 color + depth topic 正在串流（互動式 exec 內有 `ros2`）：
+
+```bash
+just exec -t runtime bash -ic 'ros2 topic hz /camera/camera/color/image_raw'
+just exec -t runtime bash -ic 'ros2 topic hz /camera/camera/depth/image_rect_raw'
+```
+
+**Visual** -- 用 `rqt` 觀看影像串流（`devel` 映像內含 `rqt_image_view`）：
+
+```bash
+just run -t devel
+# inside the container:
+ros2 launch realsense2_camera rs_launch.py &     # start the camera
+ros2 run rqt_image_view rqt_image_view           # pick color/image_raw and depth/image_rect_raw
+```
+
+> 不帶 `-t` 的 `just run` 會開 **devel** 開發 shell，不是相機 app -- app 要用
+> `just run -t runtime`。可透過傳入 launch 參數調整相機，例如
+> `just run -t runtime ros2 launch realsense2_camera rs_launch.py pointcloud.enable:=true`，
+> 或完全覆寫該指令。低階等價指令見 [使用方式](#使用方式)。
 
 ## 使用方式
 

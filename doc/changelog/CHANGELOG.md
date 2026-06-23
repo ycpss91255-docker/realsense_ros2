@@ -6,6 +6,12 @@ versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ## [Unreleased]
 
 ### Added
+- README TL;DR + Quick Start now demonstrate the actual RGB-D **app**: `just run
+  -t runtime` launches the camera node, with a CLI check (`ros2 topic hz` on the
+  colour + depth topics) and a visual demo (`rqt_image_view` in the `devel`
+  image) to see RGB + depth. Replaces the old `just build && just run`, which only
+  opens the `devel` dev shell; clarifies `just run` (devel shell) vs `just run -t
+  runtime` (the app). All 4 languages (#89).
 - README **Prerequisites** (install Docker Engine + Compose plugin + `just`; plus
   host udev rules for a physical camera) and **Uninstall / Cleanup** (`just stop`,
   `just prune`, host udev-rule removal) sections, in all 4 languages (#85). The
