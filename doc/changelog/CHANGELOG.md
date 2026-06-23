@@ -54,6 +54,13 @@ versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   vs the 0.25 threshold; sign is direction, not pass/fail).
 
 ### Fixed
+- `runtime` image now sources ROS for interactive `docker exec` shells (appends a
+  guarded `source /opt/ros/$ROS_DISTRO/setup.bash` to `/etc/bash.bashrc`), so
+  `just exec -t runtime` / `docker exec -it <runtime> bash` has `ros2` on PATH
+  with no manual source. The entrypoint sources ROS only for PID 1 (the launched
+  app) and `docker exec` bypasses it; `devel` already did this via its bashrc.d
+  drop-in. Interactive-only (non-interactive behavior unchanged), and no fragile
+  per-arch/per-python ROS paths baked into `ENV` (#87, base#657).
 - README architecture diagram + stage table (4 languages): refresh the stale
   `bats-src` / `bats-extensions` / `lint-tools` stages (removed in #72) to the
   canonical `test-tools-stage`, and show the multi-distro `sys` base image.

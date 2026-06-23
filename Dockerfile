@@ -280,13 +280,22 @@ ARG ROS_DISTRO
 ARG USER_NAME="user"
 ARG USER="${USER_NAME}"
 
+# Runtime ROS packages. Also append a ROS source to /etc/bash.bashrc so
+# interactive `docker exec` shells get `ros2` on PATH: the entrypoint sources ROS
+# for PID 1 (the launched app) only and `docker exec` bypasses the entrypoint.
+# /etc/bash.bashrc is read by interactive shells only (its leading non-interactive
+# guard short-circuits otherwise), so non-interactive correctness is untouched
+# and -- unlike baking ROS into ENV -- it is not arch-/python-version fragile.
+# devel already does this via its bashrc.d drop-in (base#657, #87). Folded into
+# this RUN (not a separate one) to avoid a consecutive-RUN lint (DL3059).
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
         ros-${ROS_DISTRO}-realsense2-camera \
         ros-${ROS_DISTRO}-realsense2-description \
         && \
     apt-get clean && \
-    rm -rf /var/lib/apt/lists/*
+    rm -rf /var/lib/apt/lists/* && \
+    printf 'source /opt/ros/%s/setup.bash\n' "${ROS_DISTRO}" >> /etc/bash.bashrc
 
 # Copy RealSense udev rules
 RUN mkdir -p /etc/udev/rules.d
