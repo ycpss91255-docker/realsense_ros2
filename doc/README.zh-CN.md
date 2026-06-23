@@ -4,11 +4,17 @@
 
 [![CI](https://github.com/ycpss91255-docker/realsense_ros2/actions/workflows/main.yaml/badge.svg)](https://github.com/ycpss91255-docker/realsense_ros2/actions/workflows/main.yaml) [![License](https://img.shields.io/badge/License-Apache--2.0-blue?style=flat-square)](../LICENSE)
 
-> **TL;DR** — 容器化的 Intel RealSense ROS 2 驱动程序。通过 apt 安装 `realsense2-camera` 和 `realsense2-description`（两者会以传递依赖方式拉入 `librealsense2`），内含 udev 规则以访问设备。
->
-> ```bash
-> just build && just run
-> ```
+## TL;DR
+
+这是一个容器化的 ROS 2 RealSense 相机 **app**：`runtime` 镜像的默认 CMD 就会 launch 相机节点、发布实时 **RGB + Depth** topic。通过 apt 安装 `realsense2-camera` / `realsense2-description`（会以传递依赖方式拉入 `librealsense2`），并内含 udev 规则以供 USB 访问。多发行版（Humble + Jazzy）、多架构（x86_64 + ARM64 / 树莓派）。
+
+```bash
+./script/install_udev_rules.sh      # host 装一次（实体相机）
+just build && just run -t runtime    # build + 启动相机 app
+# -> log 显示 "RealSense Node Is Up!" 与 depth/color 流
+```
+
+> `just run` 自身只开 **devel** 开发 shell、不是相机 app —— 要用 `just run -t runtime`。见 [Quick Start](#快速开始) 观看 RGB-D 流。
 
 ## 目录
 
@@ -76,16 +82,41 @@
 ## 快速开始
 
 ```bash
-# 1. 构建
+# 1. 构建（默认：ROS 2 Humble）
 just build
 
-# 2. 运行（默认：ros2 launch realsense2_camera rs_launch.py）
-just run
+# 2. （实体相机）在 host 上安装一次 udev 规则
+./script/install_udev_rules.sh
 
-# 或直接使用 docker compose
-docker compose up runtime
-docker compose down
+# 3. 启动相机 app。`runtime` service 的默认命令是
+#    `ros2 launch realsense2_camera rs_launch.py`；前台会显示节点 log：
+just run -t runtime
+#    ...或后台运行：
+just run -d -t runtime
 ```
+
+### See the RGB-D data
+
+**CLI** —— 确认 color + depth topic 正在串流（交互式 exec 内有 `ros2`）：
+
+```bash
+just exec -t runtime bash -ic 'ros2 topic hz /camera/camera/color/image_raw'
+just exec -t runtime bash -ic 'ros2 topic hz /camera/camera/depth/image_rect_raw'
+```
+
+**Visual** —— 用 `rqt` 查看图像流（`devel` 镜像内含 `rqt_image_view`）：
+
+```bash
+just run -t devel
+# inside the container:
+ros2 launch realsense2_camera rs_launch.py &     # start the camera
+ros2 run rqt_image_view rqt_image_view           # pick color/image_raw and depth/image_rect_raw
+```
+
+> 不带 `-t` 的 `just run` 开的是 **devel** 开发 shell、不是相机 app —— app 要用
+> `just run -t runtime`。可通过传 launch 参数调整相机，例如
+> `just run -t runtime ros2 launch realsense2_camera rs_launch.py pointcloud.enable:=true`，
+> 或完全覆写命令。底层等价命令见 [Usage](#使用方式)。
 
 ## 使用方式
 

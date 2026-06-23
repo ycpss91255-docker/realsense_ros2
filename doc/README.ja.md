@@ -6,11 +6,15 @@
 
 ## TL;DR
 
-コンテナ化された ROS 2 向け Intel RealSense ドライバ。apt から `realsense2-camera` と `realsense2-description` をインストールし（これにより `librealsense2` が依存関係として推移的に取り込まれます）、デバイスアクセス用の udev ルールを含みます。
+コンテナ化された ROS 2 RealSense カメラ **アプリ**：`runtime` イメージのデフォルト CMD がカメラノードを launch し、リアルタイムの **RGB + Depth** トピックを配信します。apt から `realsense2-camera` と `realsense2-description` をインストールし（これにより `librealsense2` が依存関係として推移的に取り込まれます）、USB アクセス用の udev ルールを同梱します。マルチディストロ（Humble + Jazzy）、マルチアーキ（x86_64 + ARM64 / Raspberry Pi）。
 
 ```bash
-just build && just run
+./script/install_udev_rules.sh      # once on the host (physical camera)
+just build && just run -t runtime    # build + launch the camera app
+# -> logs show "RealSense Node Is Up!" and depth/color streaming
 ```
+
+> `just run` 単体は **devel** 開発シェルを開くだけでカメラアプリではありません -- `just run -t runtime` を使ってください。RGB-D ストリームの確認は [クイックスタート](#クイックスタート) を参照。
 
 ---
 
@@ -83,16 +87,41 @@ Intel RealSense 深度カメラ向けに、再現可能な ROS 2 環境を提供
 ## クイックスタート
 
 ```bash
-# 1. ビルド
+# 1. Build (default: ROS 2 Humble)
 just build
 
-# 2. 実行（デフォルト：ros2 launch realsense2_camera rs_launch.py）
-just run
+# 2. (physical camera) install the host udev rules once
+./script/install_udev_rules.sh
 
-# または docker compose を直接使用
-docker compose up runtime
-docker compose down
+# 3. Launch the camera app. The `runtime` service's default command is
+#    `ros2 launch realsense2_camera rs_launch.py`; foreground shows the node logs:
+just run -t runtime
+#    ...or detached:
+just run -d -t runtime
 ```
+
+### See the RGB-D data
+
+**CLI** -- カラー + Depth トピックが配信されているか確認します（インタラクティブな exec には `ros2` があります）：
+
+```bash
+just exec -t runtime bash -ic 'ros2 topic hz /camera/camera/color/image_raw'
+just exec -t runtime bash -ic 'ros2 topic hz /camera/camera/depth/image_rect_raw'
+```
+
+**Visual** -- `rqt` で画像ストリームを表示します（`devel` イメージには `rqt_image_view` が同梱）：
+
+```bash
+just run -t devel
+# inside the container:
+ros2 launch realsense2_camera rs_launch.py &     # start the camera
+ros2 run rqt_image_view rqt_image_view           # pick color/image_raw and depth/image_rect_raw
+```
+
+> `-t` なしの `just run` は **devel** 開発シェルを開くだけでカメラアプリではありません -- アプリには
+> `just run -t runtime` を使ってください。カメラの調整は launch 引数を渡すことで行います。例：
+> `just run -t runtime ros2 launch realsense2_camera rs_launch.py pointcloud.enable:=true`、
+> あるいはコマンドを丸ごと上書きします。低レベルの等価コマンドは [使い方](#使い方) を参照。
 
 ## 使い方
 

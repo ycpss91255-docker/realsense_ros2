@@ -6,11 +6,15 @@
 
 ## TL;DR
 
-Containerized Intel RealSense driver for ROS 2. Installs `realsense2-camera` and `realsense2-description` from apt (which pull in `librealsense2` transitively), includes udev rules for device access.
+An Intel RealSense camera **as a containerized ROS 2 app**: the `runtime` image's default command launches the camera node and publishes live **RGB + depth** topics. Installs `realsense2-camera` / `realsense2-description` from apt (pulling in `librealsense2`) and ships the udev rules for USB access. Multi-distro (Humble + Jazzy), multi-arch (x86_64 + ARM64 / Raspberry Pi).
 
 ```bash
-just build && just run
+./script/install_udev_rules.sh      # once on the host (physical camera)
+just build && just run -t runtime    # build + launch the camera app
+# -> logs show "RealSense Node Is Up!" and depth/color streaming
 ```
+
+> `just run` on its own opens the **devel** dev shell, not the camera app -- use `just run -t runtime`. See [Quick Start](#quick-start) to view the RGB-D streams.
 
 ---
 
@@ -82,16 +86,41 @@ The user entry point is `just`, which drives Docker. Install these on the host o
 ## Quick Start
 
 ```bash
-# 1. Build
+# 1. Build (default: ROS 2 Humble)
 just build
 
-# 2. Run (default: ros2 launch realsense2_camera rs_launch.py)
-just run
+# 2. (physical camera) install the host udev rules once
+./script/install_udev_rules.sh
 
-# Or use docker compose directly
-docker compose up runtime
-docker compose down
+# 3. Launch the camera app. The `runtime` service's default command is
+#    `ros2 launch realsense2_camera rs_launch.py`; foreground shows the node logs:
+just run -t runtime
+#    ...or detached:
+just run -d -t runtime
 ```
+
+### See the RGB-D data
+
+**CLI** -- confirm the colour + depth topics are streaming (interactive exec has `ros2`):
+
+```bash
+just exec -t runtime bash -ic 'ros2 topic hz /camera/camera/color/image_raw'
+just exec -t runtime bash -ic 'ros2 topic hz /camera/camera/depth/image_rect_raw'
+```
+
+**Visual** -- view the image streams with `rqt` (the `devel` image ships `rqt_image_view`):
+
+```bash
+just run -t devel
+# inside the container:
+ros2 launch realsense2_camera rs_launch.py &     # start the camera
+ros2 run rqt_image_view rqt_image_view           # pick color/image_raw and depth/image_rect_raw
+```
+
+> `just run` with no `-t` opens the **devel** dev shell, not the camera app -- use
+> `just run -t runtime` for the app. Adjust the camera by passing launch args, e.g.
+> `just run -t runtime ros2 launch realsense2_camera rs_launch.py pointcloud.enable:=true`,
+> or override the command entirely. Low-level equivalents are in [Usage](#usage).
 
 ## Usage
 
