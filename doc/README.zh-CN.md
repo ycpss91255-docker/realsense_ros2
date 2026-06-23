@@ -25,10 +25,11 @@
 
 ## 概述
 
-为 Intel RealSense 深度相机提供可复现的 ROS 2 环境。容器从 ROS 2 apt 软件源安装 `ros-humble-realsense2-camera` 和 `ros-humble-realsense2-description` 软件包（`librealsense2` 库会作为其依赖以传递方式拉入），并将上游 udev 规则烤入镜像，使 USB 设备在容器内以正确的权限挂载。多架构基础镜像支持 x86_64 和 ARM64（树莓派、Jetson CPU 模式）。
+为 Intel RealSense 深度相机提供可复现的 ROS 2 环境。CI 会**同时构建 ROS 2 Humble（Ubuntu 22.04）与 Jazzy（Ubuntu 24.04）**两个版本；每个版本从 ROS 2 apt 软件源安装对应的 `ros-<distro>-realsense2-camera` 和 `ros-<distro>-realsense2-description` 软件包（`librealsense2` 库会作为其依赖以传递方式拉入），并将上游 udev 规则烤入镜像，使 USB 设备在容器内以正确的权限挂载。多架构基础镜像支持 x86_64 和 ARM64（树莓派、Jetson CPU 模式）。
 
 ## 功能特性
 
+- **多发行版**：CI 从同一份 Dockerfile 构建 ROS 2 Humble（Ubuntu 22.04）与 Jazzy（Ubuntu 24.04）
 - **Apt 安装**：从 ROS 2 apt 软件源安装 `realsense2-camera` 和 `realsense2-description`（`librealsense2` 以传递依赖方式拉入）
 - **Smoke Test**：Bats 测试在构建时自动执行，验证环境正确性
 - **Docker Compose**：单一 `compose.yaml` 管理所有目标
@@ -68,6 +69,20 @@ just setup                       # 从 setup.conf 重新生成 .env + compose.ya
 docker compose build runtime     # 等效的底层命令
 docker compose up runtime        # 启动
 docker compose exec runtime bash # 进入运行中的容器
+```
+
+### 选择 ROS 2 发行版
+
+`just build` 使用 Dockerfile 的默认值（Humble / Ubuntu 22.04 jammy）。CI 会通过
+`.github/workflows/main.yaml` 中的 `call-docker-build` matrix 自动构建 Humble 与
+Jazzy 两个版本。要在本机构建 Jazzy，请通过 `docker compose` 传入对应的 build args：
+
+```bash
+docker compose build \
+  --build-arg ROS_DISTRO=jazzy \
+  --build-arg ROS_TAG=ros-base \
+  --build-arg UBUNTU_CODENAME=noble \
+  runtime
 ```
 
 ### Smoke tests（test 阶段）
@@ -119,16 +134,12 @@ udev 规则必须装在 **host**，而不仅仅是容器内。容器没有 `udev
 
 ```mermaid
 graph TD
-    EXT1["bats/bats:1.11.0"]
-    EXT2["alpine:3.21"]
-    EXT3["alpine:3.21"]
-    EXT4["ros:humble-ros-base-jammy"]
+    EXT1["test-tools image\n(ghcr test-tools or test-tools:local)"]
+    EXT2["ros:humble-ros-base-jammy\nor ros:jazzy-ros-base-noble"]
 
-    EXT1 --> batssrc["bats-src"]
-    EXT2 --> batsext["bats-extensions"]
-    EXT3 --> lint["lint-tools"]
+    EXT1 --> ttstage["test-tools-stage"]
 
-    EXT4 --> sys["sys"]
+    EXT2 --> sys["sys"]
 
     sys --> develbase["devel-base"]
     develbase --> devel["devel\n(shipped)"]
@@ -138,22 +149,18 @@ graph TD
     runtimebase --> runtime["runtime\n(shipped)\nrealsense2_camera + udev rules"]
     runtime --> runtimetest["runtime-test (ephemeral)\nldd-resolution smoke"]
 
-    lint --> develtest
-    batssrc --> develtest
-    batsext --> develtest
+    ttstage --> develtest
 ```
 
 ### 阶段说明
 
 | 阶段 | FROM | 用途 |
 |------|------|------|
-| `bats-src` | `bats/bats:1.11.0` | Bats 可执行文件来源，不出货 |
-| `bats-extensions` | `alpine:3.21` | bats-support、bats-assert，不出货 |
-| `lint-tools` | `alpine:3.21` | ShellCheck + Hadolint，不出货 |
-| `sys` | `ros:humble-ros-base-jammy` | 公共基础：用户、locale、时区（base v0.41.0 构建契约） |
-| `devel-base` | `sys` | 开发工具 + RealSense 软件包 + Dynamic Calibration Tool（amd64） |
+| `test-tools-stage` | `${TEST_TOOLS_IMAGE}`（多架构 ghcr test-tools，或 `test-tools:local`） | ShellCheck + Hadolint + Bats，不出货 |
+| `sys` | `ros:<distro>-ros-base-<codename>`（humble-jammy / jazzy-noble） | 公共基础：用户、locale、时区（base v0.41.0 构建契约） |
+| `devel-base` | `sys` | 开发工具 + ROS 2 desktop + RealSense 软件包 + Dynamic Calibration Tool（amd64） |
 | `devel` | `devel-base` | 出货的开发镜像（默认 CMD `bash`） |
-| `devel-test` | `devel` | Lint + smoke tests，构建后丢弃（临时性） |
+| `devel-test` | `devel` + `test-tools-stage` | Lint + smoke tests，构建后丢弃（临时性） |
 | `runtime-base` | `sys` | 精简基础（`sudo`、`tini`） |
 | `runtime` | `runtime-base` | 出货的运行时镜像：RealSense 软件包 + udev 规则（默认 CMD `ros2 launch realsense2_camera rs_launch.py`） |
 | `runtime-test` | `runtime` | 对 `realsense2_camera` 库的 ldd 解析 smoke，构建后丢弃（临时性） |

@@ -39,10 +39,14 @@ does not offer it.
 
 ## What the image provides
 
-The tool is installed in the `devel-base` stage from Intel's librealsense apt
-repo (it is **not** in the ROS apt repo). It is **amd64-only** -- Intel ships no
-ARM64 build, so the install is skipped on other architectures and the multi-arch
-image still builds.
+The tool is installed in the `devel-base` stage via Intel's officially-documented
+direct-`.deb` method (`dpkg -i librscalibrationtool_<ver>_amd64.deb`), which Intel
+lists as supported on both Ubuntu 22.04 (Humble) and 24.04 (Jazzy). The single
+Intel-hosted `.deb` is a precompiled amd64 binary with no apt `Depends`; it links
+only forward-compatible standard libs, so the same package installs and runs on
+both jammy and noble even though Intel does not index it in its noble apt repo. It
+is **amd64-only** -- Intel ships no ARM64 build, so the install is skipped on ARM64
+and the multi-arch image still builds.
 
 Installed version: `librscalibrationtool` 2.13.1.0. Executables (all on `PATH`):
 
