@@ -124,32 +124,53 @@ RUN apt-get update && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 
-# Intel RealSense D400 Series Dynamic Calibration Tool (librscalibrationtool).
-# Not in the ROS apt repo, so pull it from Intel's librealsense apt repo. The
-# package is amd64-only and self-contained (no Depends on Intel's librealsense2),
-# so it does not clash with the ROS-provided librealsense. Non-amd64 (e.g. ARM64)
-# is skipped -- Intel ships no build there -- so the multi-arch image still builds.
-# The deb declares no Depends, so its runtime libs are added explicitly
-# (freeglut3 -> libglut.so.3). The repo is signed by key FB0B24895113F120; Intel's
-# published librealsense.pgp still carries only the old C8B3A55A6F3EFCDE key, so
-# fetch the current key from the Ubuntu keyserver (apt on jammy accepts an armored
-# signed-by keyring, so no gnupg is needed at build time).
-ARG RS_APT_KEY="FB0B24895113F120"
+# Intel RealSense D400 Series Dynamic Calibration Tool (librscalibrationtool):
+# Intel.Realsense.DynamicCalibrator + Intel.Realsense.CustomRW.
+#
+# Installed via Intel's officially-documented direct-.deb method
+# (`dpkg -i librscalibrationtool_<ver>_amd64.deb`, per the D400 Calibration
+# Tools User Guide), which Intel lists as supported on Ubuntu 22.04 (jammy) AND
+# 24.04 (noble). The .deb is a precompiled amd64 binary that declares no apt
+# Depends and links only forward-compatible standard libs, so the single
+# Intel-hosted .deb installs and runs on both jammy and noble -- Intel does not
+# index the package in its noble apt repo, but the direct-.deb path is the same
+# binary for every supported release. Its runtime libs are therefore installed
+# explicitly here; libglut.so.3's provider differs by release (jammy: freeglut3,
+# noble: libglut3.12) and libusb-1.0-0 resolves on noble through the t64
+# package's Provides. arm64 is skipped -- Intel ships no arm64 build -- so the
+# multi-arch image still builds.
+ARG RS_CAL_VERSION="2.13.1.0"
 RUN arch="$(dpkg --print-architecture)" && \
     if [ "${arch}" = "amd64" ]; then \
-        install -m 0755 -d /etc/apt/keyrings && \
-        curl -fsSL "https://keyserver.ubuntu.com/pks/lookup?op=get&search=0x${RS_APT_KEY}" \
-            -o /etc/apt/keyrings/librealsense.asc && \
-        echo "deb [signed-by=/etc/apt/keyrings/librealsense.asc] https://librealsense.intel.com/Debian/apt-repo ${UBUNTU_CODENAME} main" \
-            > /etc/apt/sources.list.d/librealsense.list && \
+        case "${UBUNTU_CODENAME}" in \
+            jammy) glut_pkg="freeglut3" ;; \
+            *) glut_pkg="libglut3.12" ;; \
+        esac && \
         apt-get update && \
         apt-get install -y --no-install-recommends \
-            librscalibrationtool \
-            freeglut3 && \
+            libgl1 \
+            libglu1-mesa \
+            libusb-1.0-0 \
+            libudev1 \
+            "${glut_pkg}" && \
+        # The Dynamic Calibrator links the SONAME libglut.so.3. jammy's
+        # freeglut3 ships that symlink; noble's libglut3.12 ships only
+        # libglut.so.3.12, so the jammy-built binary cannot resolve it on
+        # noble. Create the SONAME link to the installed lib (freeglut's GLUT
+        # API is ABI-stable across the soname bump). The amd64-only guard fixes
+        # the x86_64 multiarch dir; jammy already provides libglut.so.3.
+        if [ "${UBUNTU_CODENAME}" != "jammy" ]; then \
+            ln -sf libglut.so.3.12 /usr/lib/x86_64-linux-gnu/libglut.so.3 && \
+            ldconfig; \
+        fi && \
+        curl -fsSL "https://librealsense.intel.com/Debian/apt-repo/pool/jammy/main/librscalibrationtool_${RS_CAL_VERSION}_amd64.deb" \
+            -o /tmp/librscalibrationtool.deb && \
+        dpkg -i /tmp/librscalibrationtool.deb && \
+        rm -f /tmp/librscalibrationtool.deb && \
         apt-get clean && \
         rm -rf /var/lib/apt/lists/*; \
     else \
-        echo "Skipping librscalibrationtool: not available for ${arch}"; \
+        echo "Skipping librscalibrationtool: Intel ships no ${arch} build"; \
     fi
 
 ############################## devel ##############################

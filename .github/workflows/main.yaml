@@ -16,15 +16,37 @@ jobs:
   call-docker-build:
     permissions:
       contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        target:
+          - { name: humble, ros_distro: humble, ros_tag: ros-base, ubuntu_codename: jammy }
+          - { name: jazzy,  ros_distro: jazzy,  ros_tag: ros-base, ubuntu_codename: noble }
+    name: build (${{ matrix.target.name }})
     uses: ycpss91255-docker/base/.github/workflows/build-worker.yaml@v0.41.0
     with:
       image_name: realsense_ros2
       platforms: linux/amd64,linux/arm64
       test_tools_version: v0.41.0
       build_args: |
-        ROS_DISTRO=humble
-        ROS_TAG=ros-base
-        UBUNTU_CODENAME=jammy
+        ROS_DISTRO=${{ matrix.target.ros_distro }}
+        ROS_TAG=${{ matrix.target.ros_tag }}
+        UBUNTU_CODENAME=${{ matrix.target.ubuntu_codename }}
+
+  # Stable-named aggregator so branch protection's required status check does
+  # not have to enumerate every matrix entry. Branch protection references
+  # `ci-passed`; the build matrix shape can change without re-configuring it.
+  ci-passed:
+    needs: call-docker-build
+    runs-on: ubuntu-latest
+    if: ${{ !cancelled() }}
+    steps:
+      - run: |
+          if [ "${{ needs.call-docker-build.result }}" != "success" ]; then
+            echo "One or more matrix builds failed (result=${{ needs.call-docker-build.result }})"
+            exit 1
+          fi
+          echo "All matrix builds passed"
 
   call-release:
     needs: call-docker-build

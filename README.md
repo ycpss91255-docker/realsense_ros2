@@ -29,10 +29,11 @@ just build && just run
 
 ## Overview
 
-Provides a reproducible ROS 2 environment for Intel RealSense depth cameras. The container installs the `ros-humble-realsense2-camera` and `ros-humble-realsense2-description` packages from the ROS 2 apt repository (the `librealsense2` libraries come in transitively as their dependency) and ships with the upstream udev rules baked in so USB devices come up under the correct permissions inside the container. Multi-arch base image supports x86_64 and ARM64 (Raspberry Pi, Jetson CPU mode).
+Provides a reproducible ROS 2 environment for Intel RealSense depth cameras. CI builds the image for **both ROS 2 Humble (Ubuntu 22.04) and Jazzy (Ubuntu 24.04)**; each installs the matching `ros-<distro>-realsense2-camera` and `ros-<distro>-realsense2-description` packages from the ROS 2 apt repository (the `librealsense2` libraries come in transitively as their dependency) and ships with the upstream udev rules baked in so USB devices come up under the correct permissions inside the container. The multi-arch base image supports x86_64 and ARM64 (Raspberry Pi, Jetson CPU mode).
 
 ## Features
 
+- **Multi-distro**: CI builds ROS 2 Humble (Ubuntu 22.04) and Jazzy (Ubuntu 24.04) from one Dockerfile
 - **Apt-based install**: `realsense2-camera` and `realsense2-description` from ROS 2 apt repository (`librealsense2` pulled in transitively)
 - **Smoke Test**: Bats tests run automatically during build to verify environment
 - **Docker Compose**: single `compose.yaml` manages all targets
@@ -72,6 +73,21 @@ just setup                       # Regenerate .env + compose.yaml from setup.con
 docker compose build runtime     # Equivalent low-level command
 docker compose up runtime        # Start
 docker compose exec runtime bash # Enter running container
+```
+
+### Selecting a ROS 2 distro
+
+`just build` uses the Dockerfile defaults (Humble / Ubuntu 22.04 jammy). CI
+builds both Humble and Jazzy automatically via the `call-docker-build` matrix in
+`.github/workflows/main.yaml`. To build Jazzy locally, pass the matching build
+args through `docker compose`:
+
+```bash
+docker compose build \
+  --build-arg ROS_DISTRO=jazzy \
+  --build-arg ROS_TAG=ros-base \
+  --build-arg UBUNTU_CODENAME=noble \
+  runtime
 ```
 
 ### Smoke tests (test stages)
@@ -129,16 +145,12 @@ and reloads udev. Re-plug the camera afterwards. The container itself runs in
 
 ```mermaid
 graph TD
-    EXT1["bats/bats:1.11.0"]
-    EXT2["alpine:3.21"]
-    EXT3["alpine:3.21"]
-    EXT4["ros:humble-ros-base-jammy"]
+    EXT1["test-tools image\n(ghcr test-tools or test-tools:local)"]
+    EXT2["ros:humble-ros-base-jammy\nor ros:jazzy-ros-base-noble"]
 
-    EXT1 --> batssrc["bats-src"]
-    EXT2 --> batsext["bats-extensions"]
-    EXT3 --> lint["lint-tools"]
+    EXT1 --> ttstage["test-tools-stage"]
 
-    EXT4 --> sys["sys"]
+    EXT2 --> sys["sys"]
 
     sys --> develbase["devel-base"]
     develbase --> devel["devel\n(shipped)"]
@@ -148,22 +160,18 @@ graph TD
     runtimebase --> runtime["runtime\n(shipped)\nrealsense2_camera + udev rules"]
     runtime --> runtimetest["runtime-test (ephemeral)\nldd-resolution smoke"]
 
-    lint --> develtest
-    batssrc --> develtest
-    batsext --> develtest
+    ttstage --> develtest
 ```
 
 ### Stage Description
 
 | Stage | FROM | Purpose |
 |-------|------|---------|
-| `bats-src` | `bats/bats:1.11.0` | Bats binary source, not shipped |
-| `bats-extensions` | `alpine:3.21` | bats-support, bats-assert, not shipped |
-| `lint-tools` | `alpine:3.21` | ShellCheck + Hadolint, not shipped |
-| `sys` | `ros:humble-ros-base-jammy` | Common base: user, locale, timezone (base v0.41.0 build contract) |
-| `devel-base` | `sys` | Dev tools + RealSense packages + Dynamic Calibration Tool (amd64) |
+| `test-tools-stage` | `${TEST_TOOLS_IMAGE}` (multi-arch ghcr test-tools, or `test-tools:local`) | ShellCheck + Hadolint + Bats, not shipped |
+| `sys` | `ros:<distro>-ros-base-<codename>` (humble-jammy / jazzy-noble) | Common base: user, locale, timezone (base v0.41.0 build contract) |
+| `devel-base` | `sys` | Dev tools + ROS 2 desktop + RealSense packages + Dynamic Calibration Tool (amd64) |
 | `devel` | `devel-base` | Shipped dev image (default CMD `bash`) |
-| `devel-test` | `devel` | Lint + smoke tests, discarded after build (ephemeral) |
+| `devel-test` | `devel` + `test-tools-stage` | Lint + smoke tests, discarded after build (ephemeral) |
 | `runtime-base` | `sys` | Minimal base (`sudo`, `tini`) |
 | `runtime` | `runtime-base` | Shipped runtime image: RealSense packages + udev rules (default CMD `ros2 launch realsense2_camera rs_launch.py`) |
 | `runtime-test` | `runtime` | ldd-resolution smoke over `realsense2_camera` libs, discarded after build (ephemeral) |

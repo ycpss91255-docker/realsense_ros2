@@ -6,6 +6,20 @@ versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ## [Unreleased]
 
 ### Added
+- CI now builds a **ROS 2 distro matrix -- Humble (Ubuntu 22.04 jammy) and
+  Jazzy (Ubuntu 24.04 noble)** -- from a single Dockerfile, replacing the
+  prior Humble-only build (#66). Each matrix entry passes
+  `ROS_DISTRO` / `ROS_TAG` / `UBUNTU_CODENAME` and runs the full devel-test
+  (lint + bats) and runtime-test (ldd) gate on both `linux/amd64` and
+  `linux/arm64`. A stable-named `ci-passed` aggregator job fronts the matrix
+  so branch protection's required status check no longer has to enumerate
+  every entry. The Dynamic Calibration Tool now installs on **both** distros
+  (amd64) via Intel's officially-documented direct-`.deb` method (`dpkg -i`):
+  Intel lists Ubuntu 22.04 and 24.04 as supported, and the single
+  Intel-hosted `.deb` (no apt `Depends`, links only forward-compatible
+  standard libs) installs and runs on noble even though Intel does not index
+  it in its noble apt repo. This also drops the previous Intel apt-repo +
+  keyring setup. Still amd64-only (skipped on arm64).
 - Bundle the Intel RealSense D400 Series Dynamic Calibration Tool
   (`librscalibrationtool`) in the `devel` image, pulled from Intel's librealsense
   apt repo in the `devel-base` stage (amd64-only; skipped on other architectures).
@@ -34,6 +48,9 @@ versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   vs the 0.25 threshold; sign is direction, not pass/fail).
 
 ### Fixed
+- README architecture diagram + stage table (4 languages): refresh the stale
+  `bats-src` / `bats-extensions` / `lint-tools` stages (removed in #72) to the
+  canonical `test-tools-stage`, and show the multi-distro `sys` base image.
 - CI now actually builds **both** `linux/amd64` and `linux/arm64`, making good
   on the README's long-standing multi-arch claim (previously only amd64 was
   built despite the claim, #72). Achieved by passing
