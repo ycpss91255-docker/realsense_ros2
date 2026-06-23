@@ -14,8 +14,10 @@
 
 - [概述](#概述)
 - [功能特性](#功能特性)
+- [前置条件](#prerequisites)
 - [快速开始](#快速开始)
 - [使用方式](#使用方式)
+- [卸载 / 清理](#uninstall--cleanup)
 - [配置](#配置)
 - [架构](#架构)
 - [Smoke Tests](#smoke-tests)
@@ -35,6 +37,41 @@
 - **Docker Compose**：单一 `compose.yaml` 管理所有目标
 - **udev 规则**：预配置 RealSense USB 设备访问权限
 - **多架构支持**：支持 x86_64 和 ARM64（RPi、Jetson CPU 模式）
+
+## Prerequisites
+
+用户入口是 `just`，由它驱动 Docker。请在 host 上一次性安装以下工具：
+
+- **Docker Engine + Compose plugin。** wrapper 脚本会调用 `docker compose`，因此必须
+  装有 Compose plugin。官方便捷脚本会一并安装 Engine + Buildx + Compose：
+
+  ```bash
+  curl -fsSL https://get.docker.com | sudo sh
+  sudo usermod -aG docker "$USER"   # log out/in so docker runs without sudo
+  ```
+
+  用 `docker compose version` 验证。（仅装发行版软件包可能缺少 Compose ——
+  例如只装 `docker.io` 而没有 `docker-compose-v2`，会得到 `docker: unknown command:
+  docker compose`。）
+
+- **just**（命令运行器）。将预编译二进制安装到 `~/.local/bin`，无需 sudo：
+
+  ```bash
+  curl --proto '=https' --tlsv1.2 -sSf https://just.systems/install.sh | bash -s -- --to ~/.local/bin
+  ```
+
+  确保 `~/.local/bin` 在 `PATH` 中，然后用 `just --version` 验证。如果你不想安装
+  `just`，每个 recipe 也都有原始回退命令（`./script/<verb>.sh`）。
+
+- **（实体相机）host udev 规则。** 要通过 USB 使用真实的 RealSense，请在 host 上安装
+  内附的规则（见 [RealSense udev 规则](#realsense-udev-rules)）：
+
+  ```bash
+  ./script/install_udev_rules.sh
+  ```
+
+  不安装的话，容器内的非 root 用户就无法打开 raw USB 节点，SDK 会误判相机 ——
+  例如把 USB 3 设备识别成 USB 2.1（"Reduced performance expected"）。
 
 ## 快速开始
 
@@ -96,6 +133,25 @@ just build test
 # 或
 docker compose --profile test build test
 ```
+
+## Uninstall / Cleanup
+
+```bash
+just stop      # stop and remove the running containers
+just prune     # remove this repo's images + dangling build cache (see `just prune -h`)
+```
+
+要彻底移除该仓库放在 host 上的内容：
+
+- **镜像 / 构建缓存：** `just prune`（或用 `docker image rm <tag>` 移除特定镜像）。
+- **Host udev 规则**（仅当你安装过时）：
+
+  ```bash
+  sudo rm -f /etc/udev/rules.d/99-realsense-libusb.rules
+  sudo udevadm control --reload-rules && sudo udevadm trigger
+  ```
+
+- **仓库本身：** 删除克隆下来的目录。
 
 ## 配置
 

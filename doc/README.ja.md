@@ -18,8 +18,10 @@ just build && just run
 
 - [概要](#概要)
 - [機能](#機能)
+- [前提条件](#prerequisites)
 - [クイックスタート](#クイックスタート)
 - [使い方](#使い方)
+- [アンインストール / クリーンアップ](#uninstall--cleanup)
 - [設定](#設定)
 - [アーキテクチャ](#アーキテクチャ)
 - [Smoke Tests](#smoke-tests)
@@ -39,6 +41,44 @@ Intel RealSense 深度カメラ向けに、再現可能な ROS 2 環境を提供
 - **Docker Compose**：単一の `compose.yaml` で全ターゲットを管理
 - **udev ルール**：RealSense USB デバイスアクセス用に事前設定済み
 - **マルチアーキテクチャ**：x86_64 と ARM64（RPi、Jetson CPU モード）をサポート
+
+## Prerequisites
+
+ユーザーのエントリポイントは `just` で、これが Docker を駆動します。以下をホストに一度だけインストールしてください：
+
+- **Docker Engine + Compose plugin。** ラッパーは `docker compose` を呼び出すため、
+  Compose plugin が必要です。公式の便利スクリプトは Engine + Buildx + Compose を
+  まとめてインストールします：
+
+  ```bash
+  curl -fsSL https://get.docker.com | sudo sh
+  sudo usermod -aG docker "$USER"   # log out/in so docker runs without sudo
+  ```
+
+  `docker compose version` で確認してください。（ディストロのパッケージ単体では
+  Compose が欠けることがあります -- 例：`docker-compose-v2` なしの `docker.io` では
+  `docker: unknown command: docker compose` になります。）
+
+- **just**（コマンドランナー）。ビルド済みバイナリを `~/.local/bin` へ、sudo 不要：
+
+  ```bash
+  curl --proto '=https' --tlsv1.2 -sSf https://just.systems/install.sh | bash -s -- --to ~/.local/bin
+  ```
+
+  `~/.local/bin` が `PATH` にあることを確認し、`just --version` で確認してください。
+  `just` をインストールしたくない場合のために、各レシピには生のフォールバック
+  （`./script/<verb>.sh`）も用意されています。
+
+- **（実機カメラ）ホストの udev ルール。** USB 経由で実機の RealSense を使うには、
+  付属のルールをホストにインストールします（[RealSense udev ルール](#realsense-udev-rules) を参照）：
+
+  ```bash
+  ./script/install_udev_rules.sh
+  ```
+
+  これがないと、コンテナ内の非 root ユーザーは raw USB ノードを開けず、SDK がカメラを
+  誤検出します -- 例：USB 3 デバイスが USB 2.1 として列挙される（"Reduced
+  performance expected"）。
 
 ## クイックスタート
 
@@ -102,6 +142,25 @@ just build test
 # または
 docker compose --profile test build test
 ```
+
+## Uninstall / Cleanup
+
+```bash
+just stop      # stop and remove the running containers
+just prune     # remove this repo's images + dangling build cache (see `just prune -h`)
+```
+
+リポジトリがホストに配置したものを完全に削除するには：
+
+- **イメージ / ビルドキャッシュ：** `just prune`（特定のイメージは `docker image rm <tag>`）。
+- **ホストの udev ルール**（インストールした場合のみ）：
+
+  ```bash
+  sudo rm -f /etc/udev/rules.d/99-realsense-libusb.rules
+  sudo udevadm control --reload-rules && sudo udevadm trigger
+  ```
+
+- **リポジトリ：** クローンしたディレクトリを削除します。
 
 ## 設定
 
