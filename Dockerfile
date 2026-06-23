@@ -303,33 +303,44 @@ ENTRYPOINT ["/entrypoint.sh"]
 CMD ["ros2", "launch", "realsense2_camera", "rs_launch.py"]
 
 ############################## runtime-test (ephemeral) ##############################
-# Install-check smoke for the runtime image (template v0.21.1+ #243).
+# Install-check smoke for the runtime image.
 #
-# This repo overrides the default smoke (USER + bash) to verify that the
-# realsense2_camera node's shared libraries all resolve in the runtime
-# image -- the exact regression class that went undetected in
-# ros1_bridge#123 (a missing transitive .so the devel-stage bats never
-# exercised, because devel carries the full build deps). ldd every
-# installed file under the package lib dir and fail on any "not found";
-# the non-empty guard prevents a vacuous pass if the dir is ever
-# missing/empty.
+# base#647: a `-test` stage stays `FROM <the real stage it tests>` and pulls the
+# test toolchain in with `COPY --from=test-tools-stage` -- it must NOT be
+# `FROM ${TEST_TOOLS_IMAGE}`. The whole point of runtime-test is to prove the
+# real, minimal runtime image resolves every shared library its node needs (the
+# missing-transitive-.so class, ros1_bridge#123). Running that check inside the
+# fat test-tools base would let libs the minimal runtime lacks resolve against
+# the base's own copies -- a false pass that ships the bug. So the smoke runs in
+# the genuine runtime, with only Bats copied in.
 #
-# `bash -c` (not `sh -c`): the command sources ROS setup.bash and uses a
-# bash for-loop. The inner bash runs without the outer SHELL's
-# -euo pipefail, so `source` under nounset is safe (matches ros1_bridge).
+# Previously this stage ran a hand-rolled ldd loop via RUNTIME_SMOKE_CMD; the
+# checks now live in Bats (test/smoke/runtime/), run against the real runtime.
 FROM runtime AS runtime-test
 
-ARG RUNTIME_SMOKE_CMD='whoami && bash --version && \
-  source /opt/ros/${ROS_DISTRO}/setup.bash && \
-  rs_dir="/opt/ros/${ROS_DISTRO}/lib/realsense2_camera" && \
-  test -d "${rs_dir}" && \
-  bins="$(find "${rs_dir}" -maxdepth 1 \( -type f -o -type l \))" && \
-  test -n "${bins}" && \
-  for f in ${bins}; do \
-    echo "--- ldd: ${f} ---"; ldd "${f}" || true; \
-    if ldd "${f}" 2>&1 | grep -q "not found"; then \
-      echo "RUNTIME SMOKE FAIL: unresolved shared library in ${f}"; exit 1; \
-    fi; \
-  done && \
-  echo "RUNTIME SMOKE OK: realsense2_camera shared libraries resolved"'
-RUN bash -c "${RUNTIME_SMOKE_CMD}"
+USER root
+
+# Bats from the pre-built multi-arch test-tools image (same source devel-test
+# uses; no per-build download).
+COPY --from=test-tools-stage /opt/bats /opt/bats
+COPY --from=test-tools-stage /usr/lib/bats /usr/lib/bats
+RUN ln -sf /opt/bats/bin/bats /usr/local/bin/bats
+
+ENV BATS_LIB_PATH="/usr/lib/bats"
+
+# Runtime smoke tests + the shared bats helper (bats-support/assert via
+# BATS_LIB_PATH). test/smoke/runtime/ is a dedicated dir so devel-test's
+# non-recursive `bats /smoke_test/` never picks these up.
+COPY .base/test/smoke/test_helper.bash /runtime_smoke/test_helper.bash
+COPY test/smoke/runtime/ /runtime_smoke/
+
+ARG ROS_DISTRO
+ARG USER_NAME="user"
+ARG USER="${USER_NAME}"
+# Surface the configured user + distro so the runtime smoke can assert them in
+# the real runtime image. Ephemeral runtime-test stage only.
+ENV CONTAINER_EXPECTED_USER="${USER_NAME}"
+ENV CONTAINER_ROS_DISTRO="${ROS_DISTRO}"
+USER "${USER}"
+
+RUN bats /runtime_smoke/

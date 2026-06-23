@@ -25,11 +25,14 @@ setup() {
     refute_output --partial 'groupadd -g "${GID}" "${USER}"'
 }
 
-@test "runtime-test ldd smoke covers symlinks, not just regular files (#71)" {
-    # Dockerfile:runtime-test -- the find must include -type l so a packaged
+@test "runtime smoke ldd covers symlinks, not just regular files (#71)" {
+    # The runtime ldd check moved out of the Dockerfile into the runtime smoke
+    # bats (base#647). The find must still include -type l so a packaged
     # tool/lib that ships as a symlink to a versioned .so is still ldd-checked.
-    assert_file_exists "${DOCKERFILE}"
-    run grep -E 'find "\$\{rs_dir\}" -maxdepth 1' "${DOCKERFILE}"
+    # test/smoke/runtime/ ships into devel-test under /smoke_test/runtime/.
+    runtime_bats="${BATS_TEST_DIRNAME}/runtime/realsense_runtime.bats"
+    assert_file_exists "${runtime_bats}"
+    run grep -E 'find "\$\{RS_LIB_DIR\}" -maxdepth 1' "${runtime_bats}"
     assert_success
     assert_output --partial '-type l'
 }

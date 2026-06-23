@@ -41,6 +41,16 @@ versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   repos.
 
 ### Changed
+- `runtime-test` now runs Bats against the real runtime image instead of an
+  inline `RUNTIME_SMOKE_CMD` ldd loop (base#647). The stage stays `FROM runtime`
+  and `COPY --from=test-tools-stage` brings Bats in -- the same pre-built
+  multi-arch test-tools image `devel-test` already uses, so there is no
+  per-build download -- and the install-check (realsense2_camera libs resolve,
+  package present, entrypoint executable, non-root user) runs inside the genuine
+  minimal runtime rather than a fat tools base that would mask a missing
+  transitive `.so`. New tests in `test/smoke/runtime/realsense_runtime.bats` (5);
+  the #71 symlink-coverage guard now pins the `find ... -type l` in that bats
+  file. Total smoke tests 66 -> 71.
 - Move `CAMERA.md` from `doc/test/` to `doc/` (it documents manual physical-camera
   use, not build-time tests); README links + directory trees updated in 4 languages.
 - Add an "On-chip calibration" section to `doc/CAMERA.md` covering the

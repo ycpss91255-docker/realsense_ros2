@@ -1,6 +1,7 @@
 # TEST.md
 
-**66 tests** total.
+**71 tests** total -- 66 run in the `devel-test` stage, and 5 run in
+`runtime-test` against the real, minimal runtime image (base#647).
 
 ## test/smoke/ros_env.bats
 
@@ -74,7 +75,22 @@
 | Test | Description |
 |------|-------------|
 | `groupadd new-group branch names the group after ${GROUP}, not ${USER} (#71)` | Dockerfile creates the new group named after USER_GROUP |
-| `runtime-test ldd smoke covers symlinks, not just regular files (#71)` | runtime-test find includes `-type l` so symlinked libs are ldd-checked |
+| `runtime smoke ldd covers symlinks, not just regular files (#71)` | runtime smoke bats find includes `-type l` so symlinked libs are ldd-checked |
+
+## test/smoke/runtime/realsense_runtime.bats
+
+Runs in the `runtime-test` stage against the real, minimal runtime image
+(base#647), not in `devel-test`.
+
+### Runtime install-check (5)
+
+| Test | Description |
+|------|-------------|
+| `realsense2_camera lib dir exists and is non-empty` | Package lib dir exists and is non-empty (guards the ldd test against a vacuous pass) |
+| `all realsense2_camera shared objects resolve (ldd, no 'not found')` | Every file/symlink under the package lib dir is ldd-clean in the real runtime (ros1_bridge#123 class) |
+| `ros2 CLI resolves the realsense2_camera package` | `ros2 pkg prefix realsense2_camera` succeeds (the runtime CMD needs it) |
+| `entrypoint.sh exists and is executable` | `/entrypoint.sh` is executable in the runtime image |
+| `runtime runs as the configured non-root user` | Runtime user matches USER_NAME and is non-root |
 
 ## .base/test/smoke/script_help.bats
 
