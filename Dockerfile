@@ -288,6 +288,16 @@ RUN apt-get update && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 
+# Source ROS for interactive shells (e.g. `docker exec -it <runtime> bash`).
+# The entrypoint sources ROS for PID 1 (the launched app) only, and `docker exec`
+# bypasses the entrypoint -- so without this an interactive exec shell has no
+# `ros2` on PATH. /etc/bash.bashrc is read by interactive shells only (its
+# leading non-interactive guard short-circuits otherwise), so this does not
+# touch non-interactive correctness, and unlike baking ROS into ENV it is not
+# arch-/python-version-fragile (base#657, #87). devel already does this via its
+# bashrc.d drop-in; this closes the runtime gap without the full config/ COPY.
+RUN printf '\n# Source ROS 2 for interactive shells (docker exec; entrypoint covers PID 1 only).\nif [ -f "/opt/ros/${ROS_DISTRO}/setup.bash" ]; then source "/opt/ros/${ROS_DISTRO}/setup.bash"; fi\n' >> /etc/bash.bashrc
+
 # Copy RealSense udev rules
 RUN mkdir -p /etc/udev/rules.d
 COPY --chmod=0644 config/realsense/99-realsense-libusb.rules /etc/udev/rules.d/
