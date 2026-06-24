@@ -123,9 +123,19 @@ ros2 run rqt_image_view rqt_image_view           # pick color/image_raw and dept
 ```
 
 > `just run` with no `-t` opens the **devel** dev shell, not the camera app -- use
-> `just run -t runtime` for the app. Adjust the camera by passing launch args, e.g.
-> `just run -t runtime ros2 launch realsense2_camera rs_launch.py pointcloud.enable:=true`,
-> or override the command entirely. Low-level equivalents are in [Usage](#usage).
+> `just run -t runtime` for the app. To override the launch (e.g. enable the point
+> cloud), use the low-level command, which replaces the default launch:
+> `docker compose run --rm runtime ros2 launch realsense2_camera rs_launch.py pointcloud.enable:=true`.
+> The `just run -t runtime <cmd>` form of overriding is broken upstream and being
+> fixed ([base#679](https://github.com/ycpss91255-docker/base/issues/679)). More
+> low-level equivalents are in [Usage](#usage).
+
+> **USB 2.x:** if the camera log shows `Reduced performance ... 2.1 port` and the
+> topics carry no data, the link negotiated USB 2.x and the default profile is too
+> heavy. Use a lower profile, e.g.
+> `docker compose run --rm runtime ros2 launch realsense2_camera rs_launch.py depth_module.depth_profile:=480x270x6 rgb_camera.color_profile:=424x240x6`
+> (tested on a D435 over USB 2 -- RGB + depth stream at ~6 Hz). For the full default
+> profile use a USB 3 cable into a SuperSpeed port directly on the host, not via a hub.
 
 ## Usage
 

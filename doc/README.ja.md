@@ -124,9 +124,19 @@ ros2 run rqt_image_view rqt_image_view           # pick color/image_raw and dept
 ```
 
 > `-t` なしの `just run` は **devel** 開発シェルを開くだけでカメラアプリではありません -- アプリには
-> `just run -t runtime` を使ってください。カメラの調整は launch 引数を渡すことで行います。例：
-> `just run -t runtime ros2 launch realsense2_camera rs_launch.py pointcloud.enable:=true`、
-> あるいはコマンドを丸ごと上書きします。低レベルの等価コマンドは [使い方](#使い方) を参照。
+> `just run -t runtime` を使ってください。launch 引数を上書きするには（例: point cloud を有効化）、
+> デフォルトの launch を置き換える低レベルコマンドを使います：
+> `docker compose run --rm runtime ros2 launch realsense2_camera rs_launch.py pointcloud.enable:=true`。
+> `just run -t runtime <cmd>` 形式の上書きは upstream で壊れており、修正中です
+> （[base#679](https://github.com/ycpss91255-docker/base/issues/679)）。他の低レベルの等価コマンドは
+> [使い方](#使い方) を参照。
+
+> **USB 2.x:** カメラの log に `Reduced performance ... 2.1 port` が出てトピックにデータが
+> 流れない場合、リンクが USB 2.x でネゴシエートされ、デフォルト profile が重すぎます。
+> 低めの profile を使ってください。例：
+> `docker compose run --rm runtime ros2 launch realsense2_camera rs_launch.py depth_module.depth_profile:=480x270x6 rgb_camera.color_profile:=424x240x6`
+> （D435 over USB 2 で実測 -- RGB + depth が ~6 Hz で安定）。完全なデフォルト profile には、
+> hub を介さず USB 3 ケーブルでホストの SuperSpeed ポートへ直結してください。
 
 ## 使い方
 

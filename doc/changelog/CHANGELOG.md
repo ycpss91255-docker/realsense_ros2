@@ -66,6 +66,17 @@ versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   vs the 0.25 threshold; sign is direction, not pass/fail).
 
 ### Fixed
+- README now passes custom launch args via the low-level
+  `docker compose run --rm runtime ros2 launch ...` command (which replaces the
+  default launch through the entrypoint), because the `just run -t runtime <cmd>`
+  override form is broken upstream (`exec: "ros2": executable file not found` --
+  tracked in [base#679](https://github.com/ycpss91255-docker/base/issues/679)).
+  Also adds a USB 2.x troubleshooting note: when the link negotiates USB 2.x the
+  default profile is too heavy and topics carry no data; use a lower profile
+  (`depth_module.depth_profile:=480x270x6 rgb_camera.color_profile:=424x240x6`,
+  ~6 Hz on a D435 over USB 2) or a USB 3 SuperSpeed port direct to the host. All
+  4 languages. Surfaced re-testing the repo strictly from the README on a
+  Raspberry Pi.
 - `script/install_udev_rules.sh` is now executable (was committed `0644`), so the
   README's documented `./script/install_udev_rules.sh` no longer fails with
   `Permission denied` on a fresh clone. Guarded by a new `is executable` smoke
