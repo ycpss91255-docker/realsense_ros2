@@ -60,6 +60,11 @@ versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   vs the 0.25 threshold; sign is direction, not pass/fail).
 
 ### Fixed
+- `script/install_udev_rules.sh` is now executable (was committed `0644`), so the
+  README's documented `./script/install_udev_rules.sh` no longer fails with
+  `Permission denied` on a fresh clone. Guarded by a new `is executable` smoke
+  test in `test/smoke/install_udev_rules.bats`. Surfaced re-testing the repo
+  strictly from the README on a fresh Raspberry Pi clone.
 - `runtime` image now sources ROS for interactive `docker exec` shells (appends a
   guarded `source /opt/ros/$ROS_DISTRO/setup.bash` to `/etc/bash.bashrc`), so
   `just exec -t runtime` / `docker exec -it <runtime> bash` has `ros2` on PATH
