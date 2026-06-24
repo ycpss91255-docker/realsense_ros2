@@ -23,3 +23,12 @@ setup() {
     run bash /lint/install_udev_rules.sh -h
     assert_line --partial "Usage:"
 }
+
+# Regression: the README documents `./script/install_udev_rules.sh` (direct
+# execution), so the file must carry the executable bit. It shipped as 0644
+# once, which made the documented command fail with "Permission denied" on a
+# fresh clone. COPY preserves the source mode, so a 0644 regression surfaces
+# here.
+@test "install_udev_rules.sh is executable" {
+    [ -x /lint/install_udev_rules.sh ]
+}

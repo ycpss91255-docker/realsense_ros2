@@ -1,6 +1,6 @@
 # TEST.md
 
-**66 tests** total.
+**67 tests** total.
 
 ## test/smoke/ros_env.bats
 
@@ -59,13 +59,14 @@
 
 ## test/smoke/install_udev_rules.bats
 
-### install_udev_rules.sh (3)
+### install_udev_rules.sh (4)
 
 | Test | Description |
 |------|-------------|
 | `install_udev_rules.sh -h exits 0` | Help exits successfully |
 | `install_udev_rules.sh --help exits 0` | Help exits successfully |
 | `install_udev_rules.sh -h prints usage` | Help output contains "Usage:" |
+| `install_udev_rules.sh is executable` | Script carries the executable bit so the documented `./script/install_udev_rules.sh` works |
 
 ## test/smoke/dockerfile_guards.bats
 

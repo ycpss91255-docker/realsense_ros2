@@ -97,6 +97,10 @@ just run -t runtime
 just run -d -t runtime
 ```
 
+> 只是要用相機的部署機（例如只跑相機的 Raspberry Pi）可略過 step 1：`just build`
+> 建的是供開發用的 **devel** 映像（ros-desktop、rviz、rqt -- 4GB+）。`just run -t runtime`
+> 在首次使用時會自動建最小化的 runtime 映像，相機 app 不需要先 `just build`。
+
 ### See the RGB-D data
 
 **CLI** -- 確認 color + depth topic 正在串流（互動式 exec 內有 `ros2`）：
@@ -116,9 +120,18 @@ ros2 run rqt_image_view rqt_image_view           # pick color/image_raw and dept
 ```
 
 > 不帶 `-t` 的 `just run` 會開 **devel** 開發 shell，不是相機 app -- app 要用
-> `just run -t runtime`。可透過傳入 launch 參數調整相機，例如
-> `just run -t runtime ros2 launch realsense2_camera rs_launch.py pointcloud.enable:=true`，
-> 或完全覆寫該指令。低階等價指令見 [使用方式](#使用方式)。
+> `just run -t runtime`。要覆寫 launch 參數（例如開啟 point cloud），請用 low-level
+> 指令，它會取代預設 launch：
+> `docker compose run --rm runtime ros2 launch realsense2_camera rs_launch.py pointcloud.enable:=true`。
+> `just run -t runtime <cmd>` 形式的覆寫目前在 upstream 是壞的，正在修復中
+> （[base#679](https://github.com/ycpss91255-docker/base/issues/679)）。更多 low-level
+> 等價指令見 [使用方式](#使用方式)。
+
+> **USB 2.x：** 若相機 log 出現 `Reduced performance ... 2.1 port` 且 topic 沒有資料，
+> 代表連線協商成 USB 2.x、預設 profile 太重。請改用較低 profile，例如
+> `docker compose run --rm runtime ros2 launch realsense2_camera rs_launch.py depth_module.depth_profile:=480x270x6 rgb_camera.color_profile:=424x240x6`
+> （實測 D435 over USB 2 -- RGB + depth 穩定 ~6 Hz）。要跑完整預設 profile，請用 USB 3
+> 線材直接接主機 SuperSpeed port，勿經 hub。
 
 ## 使用方式
 
