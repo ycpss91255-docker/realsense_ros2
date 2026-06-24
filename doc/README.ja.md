@@ -100,6 +100,11 @@ just run -t runtime
 just run -d -t runtime
 ```
 
+> カメラを使うだけのデプロイ機（例：カメラだけ動かす Raspberry Pi）は step 1 を省略できます。
+> `just build` は開発用の **devel** イメージ（ros-desktop、rviz、rqt -- 4GB+）をビルドします。
+> `just run -t runtime` は初回利用時に最小限の runtime イメージを自動ビルドするため、
+> カメラアプリに事前の `just build` は不要です。
+
 ### See the RGB-D data
 
 **CLI** -- カラー + Depth トピックが配信されているか確認します（インタラクティブな exec には `ros2` があります）：

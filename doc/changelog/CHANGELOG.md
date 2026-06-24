@@ -6,6 +6,12 @@ versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ## [Unreleased]
 
 ### Added
+- README Quick Start now notes that use-only deployments (e.g. a Raspberry Pi
+  that just runs the camera) can skip `just build`: `just build` produces the
+  large **devel** image (ros-desktop, rviz, rqt), whereas `just run -t runtime`
+  auto-builds the minimal runtime image on first use, so the camera app needs no
+  prior `just build`. All 4 languages. Surfaced re-testing the repo strictly from
+  the README on a Raspberry Pi.
 - README TL;DR + Quick Start now demonstrate the actual RGB-D **app**: `just run
   -t runtime` launches the camera node, with a CLI check (`ros2 topic hz` on the
   colour + depth topics) and a visual demo (`rqt_image_view` in the `devel`

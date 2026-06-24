@@ -99,6 +99,11 @@ just run -t runtime
 just run -d -t runtime
 ```
 
+> Use-only deployment (e.g. a Raspberry Pi that just runs the camera) can skip
+> step 1: `just build` builds the **devel** image (ros-desktop, rviz, rqt --
+> 4GB+) for development. `just run -t runtime` auto-builds the minimal runtime
+> image on first use, so the camera app needs no prior `just build`.
+
 ### See the RGB-D data
 
 **CLI** -- confirm the colour + depth topics are streaming (interactive exec has `ros2`):

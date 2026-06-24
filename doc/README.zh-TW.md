@@ -97,6 +97,10 @@ just run -t runtime
 just run -d -t runtime
 ```
 
+> 只是要用相機的部署機（例如只跑相機的 Raspberry Pi）可略過 step 1：`just build`
+> 建的是供開發用的 **devel** 映像（ros-desktop、rviz、rqt -- 4GB+）。`just run -t runtime`
+> 在首次使用時會自動建最小化的 runtime 映像，相機 app 不需要先 `just build`。
+
 ### See the RGB-D data
 
 **CLI** -- 確認 color + depth topic 正在串流（互動式 exec 內有 `ros2`）：
