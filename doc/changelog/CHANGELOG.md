@@ -6,6 +6,7 @@ versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ## [Unreleased]
 
 ### Added
+- README **Multi-machine (ROS 2)** section (all 4 languages): consume the camera from another machine via DDS auto-discovery by setting a matching `ROS_DOMAIN_ID` in the `.env` workload overlay -- no master, no command-line flags, since `compose.yaml` injects `.env` via `env_file`. Documents the host-network / `ROS_LOCALHOST_ONLY` requirements and the best-effort-QoS frame-drop caveat. Verified across a Pi + host (~10 Hz over a direct link).
 - README TL;DR + Quick Start now demonstrate the actual RGB-D **app**: `just run
   -t runtime` launches the camera node, with a CLI check (`ros2 topic hz` on the
   colour + depth topics) and a visual demo (`rqt_image_view` in the `devel`
