@@ -25,6 +25,7 @@ just build && just run -t runtime    # build + launch the camera app
 - [Prerequisites](#prerequisites)
 - [Quick Start](#quick-start)
 - [Usage](#usage)
+- [Multi-machine](#multi-machine-ros-2)
 - [Uninstall / Cleanup](#uninstall--cleanup)
 - [Configuration](#configuration)
 - [Architecture](#architecture)
@@ -170,6 +171,51 @@ just build test
 # or
 docker compose --profile test build test
 ```
+
+## Multi-machine (ROS 2)
+
+ROS 2 has no master -- nodes on the same **DDS domain** discover each other
+automatically over the LAN, so there is no `ROS_MASTER_URI` / `ROS_IP` to set.
+The one value that must match on every machine is the domain ID, a
+per-deployment runtime value, so it goes in **`.env`** (the hand-authored
+workload overlay -- injected via `env_file: - .env`, applied by `just run`
+alone, never regenerated, git-ignored). Machine-baked / build params (GPU,
+privileged, mounts) stay in `config/docker/setup.conf`.
+
+This repo already ships `[network] mode = host`, so DDS discovery (multicast)
+and traffic use the host's real interface -- reachable from other machines.
+
+**On the camera machine (e.g. a Raspberry Pi):** add to `.env`
+
+```ini
+ROS_DOMAIN_ID=0    # any 0..101; MUST be identical on every machine
+```
+
+then launch with no extra flags -- compose injects `.env`:
+
+```bash
+just run -t runtime
+```
+
+**On the other machine:** set the same domain and subscribe (any ROS 2
+environment):
+
+```bash
+export ROS_DOMAIN_ID=0
+ros2 topic hz /camera/camera/color/image_raw   # auto-discovered, no master
+```
+
+> **Requirements:** both machines on the same subnet; `[network] mode = host`
+> (the default here); and `ROS_LOCALHOST_ONLY` unset or `0` (the default --
+> setting `1` confines DDS to loopback and blocks cross-machine discovery).
+>
+> **Bandwidth:** raw image topics are heavy. Over a constrained link DDS
+> best-effort QoS may drop frames, so a 30 Hz source can arrive at ~10 Hz. Use
+> the `compressed` image transport or a lower profile if you need full rate.
+
+Verified on a Raspberry Pi 5 (camera) and a host, both `ROS_DOMAIN_ID=0`:
+`/camera/camera/color/image_raw` was auto-discovered on the host (~10 Hz over a
+direct link, frames dropped by best-effort QoS as noted).
 
 ## Uninstall / Cleanup
 

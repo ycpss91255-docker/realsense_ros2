@@ -25,6 +25,7 @@ just build && just run -t runtime    # build + launch the camera app
 - [前置需求](#prerequisites)
 - [快速開始](#快速開始)
 - [使用方式](#使用方式)
+- [多機連線](#multi-machine-ros-2)
 - [解除安裝 / 清理](#uninstall--cleanup)
 - [設定](#設定)
 - [架構](#架構)
@@ -167,6 +168,49 @@ just build test
 # 或
 docker compose --profile test build test
 ```
+
+## Multi-machine (ROS 2)
+
+ROS 2 沒有 master——同一個 **DDS domain** 上的節點會透過 LAN 自動互相探索，
+因此沒有 `ROS_MASTER_URI` / `ROS_IP` 需要設定。每台機器唯一必須一致的值是
+domain ID，這是每次部署時的執行期數值，所以它放在 **`.env`**（手動撰寫的
+workload overlay——透過 `env_file: - .env` 注入，只由 `just run` 套用，永遠
+不會被重新產生，且已被 git 忽略）。機器層級／建置參數（GPU、privileged、
+掛載）則留在 `config/docker/setup.conf`。
+
+此 repo 已預設 `[network] mode = host`，所以 DDS 探索（multicast）與流量都走
+主機真實網卡——其他機器可以連得到。
+
+**在相機端機器（例如 Raspberry Pi）：** 在 `.env` 加入
+
+```ini
+ROS_DOMAIN_ID=0    # any 0..101; MUST be identical on every machine
+```
+
+接著不需任何額外旗標即可啟動——compose 會注入 `.env`：
+
+```bash
+just run -t runtime
+```
+
+**在另一台機器：** 設定相同的 domain 並訂閱（任何 ROS 2 環境皆可）：
+
+```bash
+export ROS_DOMAIN_ID=0
+ros2 topic hz /camera/camera/color/image_raw   # auto-discovered, no master
+```
+
+> **需求條件：** 兩台機器位於同一個子網路；`[network] mode = host`（此處的
+> 預設值）；且 `ROS_LOCALHOST_ONLY` 未設定或為 `0`（預設——設為 `1` 會將 DDS
+> 限制在 loopback，阻擋跨機器探索）。
+>
+> **頻寬：** 原始影像 topic 很重。在受限的連線上 DDS best-effort QoS 可能會
+> 丟 frame，因此 30 Hz 的來源可能只收到約 10 Hz。若需要完整 frame rate，請
+> 改用 `compressed` image transport 或較低的 profile。
+
+已在 Raspberry Pi 5（相機）與一台主機上驗證，兩者皆 `ROS_DOMAIN_ID=0`：
+`/camera/camera/color/image_raw` 在主機上被自動探索到（透過直連約 10 Hz，
+如上所述 frame 因 best-effort QoS 而被丟棄）。
 
 ## Uninstall / Cleanup
 

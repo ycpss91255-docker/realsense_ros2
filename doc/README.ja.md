@@ -25,6 +25,7 @@ just build && just run -t runtime    # build + launch the camera app
 - [前提条件](#prerequisites)
 - [クイックスタート](#クイックスタート)
 - [使い方](#使い方)
+- [マルチマシン](#multi-machine-ros-2)
 - [アンインストール / クリーンアップ](#uninstall--cleanup)
 - [設定](#設定)
 - [アーキテクチャ](#アーキテクチャ)
@@ -171,6 +172,53 @@ just build test
 # または
 docker compose --profile test build test
 ```
+
+## Multi-machine (ROS 2)
+
+ROS 2 には master がありません——同じ **DDS domain** 上のノードは LAN 越しに
+自動的に互いを発見するため、設定すべき `ROS_MASTER_URI` / `ROS_IP` はありません。
+すべてのマシンで一致させる必要がある唯一の値は domain ID で、これはデプロイ
+ごとのランタイム値なので **`.env`**（手動で書く workload overlay——`env_file:
+- .env` で注入され、`just run` だけで適用され、再生成されず、git で無視される）
+に置きます。マシン固有／ビルドパラメータ（GPU、privileged、マウント）は
+`config/docker/setup.conf` に残します。
+
+この repo はすでに `[network] mode = host` を出荷しているため、DDS の発見
+（multicast）とトラフィックはホストの実インターフェースを使い——他のマシン
+から到達できます。
+
+**カメラ側のマシン（例：Raspberry Pi）：** `.env` に追記します
+
+```ini
+ROS_DOMAIN_ID=0    # any 0..101; MUST be identical on every machine
+```
+
+そして追加のフラグなしで起動します——compose が `.env` を注入します：
+
+```bash
+just run -t runtime
+```
+
+**もう一方のマシン：** 同じ domain を設定して購読します（任意の ROS 2 環境）：
+
+```bash
+export ROS_DOMAIN_ID=0
+ros2 topic hz /camera/camera/color/image_raw   # auto-discovered, no master
+```
+
+> **要件：** 両マシンが同じサブネット上にあること；`[network] mode = host`
+> （ここでのデフォルト）；そして `ROS_LOCALHOST_ONLY` が未設定または `0`
+> （デフォルト——`1` にすると DDS が loopback に閉じ込められ、マシン間の発見が
+> ブロックされます）。
+>
+> **帯域幅：** raw image topic は重いです。制約のあるリンクでは DDS の
+> best-effort QoS がフレームを落とすことがあり、30 Hz のソースが約 10 Hz で
+> 届くことがあります。フルレートが必要なら `compressed` image transport か
+> より低いプロファイルを使ってください。
+
+Raspberry Pi 5（カメラ）とホストの両方を `ROS_DOMAIN_ID=0` にして検証済み：
+`/camera/camera/color/image_raw` はホスト上で自動発見されました（直結リンクで
+約 10 Hz、上述のとおり best-effort QoS によりフレームが落ちます）。
 
 ## Uninstall / Cleanup
 
