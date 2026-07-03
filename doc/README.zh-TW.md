@@ -92,7 +92,7 @@ just build
 ./script/install_udev_rules.sh
 
 # 3. Launch the camera app. The `runtime` service's default command is
-#    `ros2 launch realsense2_camera rs_launch.py`; foreground shows the node logs:
+#    `ros2 launch realsense2_camera rs_align_depth_launch.py`; foreground shows the node logs:
 just run -t runtime
 #    ...or detached:
 just run -d -t runtime
@@ -112,7 +112,7 @@ just exec -t runtime bash -ic 'ros2 topic hz /camera/camera/depth/image_rect_raw
 ```bash
 just run -t devel
 # inside the container:
-ros2 launch realsense2_camera rs_launch.py &     # start the camera
+ros2 launch realsense2_camera rs_align_depth_launch.py &     # start the camera
 ros2 run rqt_image_view rqt_image_view           # pick color/image_raw and depth/image_rect_raw
 ```
 
@@ -296,7 +296,7 @@ graph TD
 | `devel` | `devel-base` | 出貨的開發映像（預設 CMD `bash`） |
 | `devel-test` | `devel` + `test-tools-stage` | Lint + smoke tests，建置後丟棄（暫時性） |
 | `runtime-base` | `sys` | 最小基底（`sudo`、`tini`） |
-| `runtime` | `runtime-base` | 出貨的 runtime 映像：RealSense 套件 + udev 規則（預設 CMD `ros2 launch realsense2_camera rs_launch.py`） |
+| `runtime` | `runtime-base` | 出貨的 runtime 映像：RealSense 套件 + udev 規則（預設 CMD `ros2 launch realsense2_camera rs_align_depth_launch.py`） |
 | `runtime-test` | `runtime` | 對 `realsense2_camera` 函式庫執行 ldd 解析 smoke，建置後丟棄（暫時性） |
 
 ## Smoke Tests

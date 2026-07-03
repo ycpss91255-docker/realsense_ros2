@@ -94,7 +94,7 @@ just build
 ./script/install_udev_rules.sh
 
 # 3. Launch the camera app. The `runtime` service's default command is
-#    `ros2 launch realsense2_camera rs_launch.py`; foreground shows the node logs:
+#    `ros2 launch realsense2_camera rs_align_depth_launch.py`; foreground shows the node logs:
 just run -t runtime
 #    ...or detached:
 just run -d -t runtime
@@ -114,7 +114,7 @@ just exec -t runtime bash -ic 'ros2 topic hz /camera/camera/depth/image_rect_raw
 ```bash
 just run -t devel
 # inside the container:
-ros2 launch realsense2_camera rs_launch.py &     # start the camera
+ros2 launch realsense2_camera rs_align_depth_launch.py &     # start the camera
 ros2 run rqt_image_view rqt_image_view           # pick color/image_raw and depth/image_rect_raw
 ```
 
@@ -306,7 +306,7 @@ graph TD
 | `devel` | `devel-base` | Shipped dev image (default CMD `bash`) |
 | `devel-test` | `devel` + `test-tools-stage` | Lint + smoke tests, discarded after build (ephemeral) |
 | `runtime-base` | `sys` | Minimal base (`sudo`, `tini`) |
-| `runtime` | `runtime-base` | Shipped runtime image: RealSense packages + udev rules (default CMD `ros2 launch realsense2_camera rs_launch.py`) |
+| `runtime` | `runtime-base` | Shipped runtime image: RealSense packages + udev rules (default CMD `ros2 launch realsense2_camera rs_align_depth_launch.py`) |
 | `runtime-test` | `runtime` | ldd-resolution smoke over `realsense2_camera` libs, discarded after build (ephemeral) |
 
 ## Smoke Tests

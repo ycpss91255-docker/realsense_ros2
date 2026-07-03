@@ -54,6 +54,13 @@ versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   repos.
 
 ### Changed
+- `runtime` image now aligns depth to colour by default: the default CMD switches
+  from `rs_launch.py` to Intel's packaged `rs_align_depth_launch.py`, so a plain
+  `just run -t runtime` additionally publishes
+  `/camera/camera/aligned_depth_to_color/image_raw` (the aligned launch is a thin
+  wrapper that sets `align_depth.enable` default true and delegates to
+  `rs_launch.py`). Override the command to fall back to the non-aligned launch or
+  pass other args (#94).
 - Move `CAMERA.md` from `doc/test/` to `doc/` (it documents manual physical-camera
   use, not build-time tests); README links + directory trees updated in 4 languages.
 - Add an "On-chip calibration" section to `doc/CAMERA.md` covering the
