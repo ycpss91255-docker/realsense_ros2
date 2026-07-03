@@ -37,7 +37,7 @@ Passing this confirms the camera, driver, and USB permissions all work.
 Start the camera node:
 
 ```bash
-ros2 launch realsense2_camera rs_launch.py
+ros2 launch realsense2_camera rs_align_depth_launch.py
 ```
 
 In a second shell into the same container (`just exec bash` from the host):
