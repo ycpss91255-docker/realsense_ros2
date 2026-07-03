@@ -309,7 +309,7 @@ WORKDIR "${HOME}/work"
 EXPOSE 22
 
 ENTRYPOINT ["/entrypoint.sh"]
-CMD ["ros2", "launch", "realsense2_camera", "rs_launch.py"]
+CMD ["ros2", "launch", "realsense2_camera", "rs_align_depth_launch.py"]
 
 ############################## runtime-test (ephemeral) ##############################
 # Install-check smoke for the runtime image (template v0.21.1+ #243).
