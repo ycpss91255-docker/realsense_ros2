@@ -1,6 +1,6 @@
 # TEST.md
 
-**66 tests** total.
+**70 tests** total.
 
 ## test/smoke/ros_env.bats
 
@@ -17,8 +17,8 @@
 
 | Test | Description |
 |------|-------------|
-| `realsense2_camera is installed` | `ros-${ROS_DISTRO}-realsense2-camera` package installed |
-| `realsense2_description is installed` | `ros-${ROS_DISTRO}-realsense2-description` package installed |
+| `realsense2_camera is discoverable via ament index (source build)` | `realsense2_camera` ament marker present under `/opt/ros/${ROS_DISTRO}` (built from pinned source, #97) |
+| `realsense2_description is discoverable via ament index (source build)` | `realsense2_description` ament marker present under `/opt/ros/${ROS_DISTRO}` (bundled in realsense-ros source, #97) |
 | `RealSense SDK tool libraries resolve (rs-enumerate-devices)` | SDK CLI tool's shared libraries (librealsense2.so) all resolve via ldd with ROS sourced |
 
 ### Desktop GUI (devel) (2)
@@ -69,12 +69,16 @@
 
 ## test/smoke/dockerfile_guards.bats
 
-### Dockerfile static guards (#71) (2)
+### Dockerfile static guards (6)
 
 | Test | Description |
 |------|-------------|
 | `groupadd new-group branch names the group after ${GROUP}, not ${USER} (#71)` | Dockerfile creates the new group named after USER_GROUP |
 | `runtime-test ldd smoke covers symlinks, not just regular files (#71)` | runtime-test find includes `-type l` so symlinked libs are ldd-checked |
+| `devel-base/runtime no longer apt-install the RealSense packages (#97)` | The apt `realsense2-camera` / `-description` installs are gone (source build) |
+| `version ARGs are pinned, not floating (#97)` | `LIBREALSENSE_VERSION=v2.58.2` / `REALSENSE_ROS_VERSION=4.58.2` pinned, not `latest` |
+| `runtime-test smoke asserts the ament marker (#97)` | runtime smoke runs `ros2 pkg prefix realsense2_camera` to catch a missed marker |
+| `runtime rosdep skips the self-built SDK and resolves exec deps only (#97)` | runtime rosdep uses `--dependency-types=exec --skip-keys=librealsense2` |
 
 ## .base/test/smoke/script_help.bats
 

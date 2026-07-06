@@ -6,7 +6,7 @@
 
 ## TL;DR
 
-An Intel RealSense camera **as a containerized ROS 2 app**: the `runtime` image's default command launches the camera node and publishes live **RGB + depth** topics. Installs `realsense2-camera` / `realsense2-description` from apt (pulling in `librealsense2`) and ships the udev rules for USB access. Multi-distro (Humble + Jazzy), multi-arch (x86_64 + ARM64 / Raspberry Pi).
+An Intel RealSense camera **as a containerized ROS 2 app**: the `runtime` image's default command launches the camera node and publishes live **RGB + depth** topics. Builds **librealsense (SDK) + realsense-ros from pinned source** (`LIBREALSENSE_VERSION` / `REALSENSE_ROS_VERSION`), installed into `/opt/ros/<distro>`, and ships the udev rules for USB access. Multi-distro (Humble + Jazzy), multi-arch (x86_64 + ARM64 / Raspberry Pi).
 
 ```bash
 ./script/install_udev_rules.sh      # once on the host (physical camera)
@@ -36,12 +36,12 @@ just build && just run -t runtime    # build + launch the camera app
 
 ## Overview
 
-Provides a reproducible ROS 2 environment for Intel RealSense depth cameras. CI builds the image for **both ROS 2 Humble (Ubuntu 22.04) and Jazzy (Ubuntu 24.04)**; each installs the matching `ros-<distro>-realsense2-camera` and `ros-<distro>-realsense2-description` packages from the ROS 2 apt repository (the `librealsense2` libraries come in transitively as their dependency) and ships with the upstream udev rules baked in so USB devices come up under the correct permissions inside the container. The multi-arch base image supports x86_64 and ARM64 (Raspberry Pi, Jetson CPU mode).
+Provides a reproducible ROS 2 environment for Intel RealSense depth cameras. CI builds the image for **both ROS 2 Humble (Ubuntu 22.04) and Jazzy (Ubuntu 24.04)**; each **builds the librealsense SDK and the realsense-ros wrapper from pinned source** (`LIBREALSENSE_VERSION` / `REALSENSE_ROS_VERSION`) and installs both into `/opt/ros/<distro>` (mirroring where the apt packages used to land, so the ament index discovers them with no overlay). The image ships with the upstream udev rules baked in so USB devices come up under the correct permissions inside the container. The multi-arch base image supports x86_64 and ARM64 (Raspberry Pi, Jetson CPU mode).
 
 ## Features
 
 - **Multi-distro**: CI builds ROS 2 Humble (Ubuntu 22.04) and Jazzy (Ubuntu 24.04) from one Dockerfile
-- **Apt-based install**: `realsense2-camera` and `realsense2-description` from ROS 2 apt repository (`librealsense2` pulled in transitively)
+- **Source-built (pinned)**: librealsense + realsense-ros compiled from pinned tags (`LIBREALSENSE_VERSION` / `REALSENSE_ROS_VERSION`); override via `--build-arg`
 - **Smoke Test**: Bats tests run automatically during build to verify environment
 - **Docker Compose**: single `compose.yaml` manages all targets
 - **udev rules**: Pre-configured for RealSense USB device access
@@ -158,6 +158,31 @@ docker compose build \
   --build-arg UBUNTU_CODENAME=noble \
   runtime
 ```
+
+### Pinning the RealSense source versions
+
+The librealsense SDK and the realsense-ros wrapper are compiled from **pinned
+git tags**, not apt, so builds are reproducible and do not auto-ship upstream
+regressions. Two build-args hold the tags (defaults live in the Dockerfile):
+
+- `LIBREALSENSE_VERSION` (default `v2.58.2`) -- IntelRealSense/librealsense tag
+- `REALSENSE_ROS_VERSION` (default `4.58.2`) -- IntelRealSense/realsense-ros tag
+
+Override either at build time:
+
+```bash
+just build --build-arg LIBREALSENSE_VERSION=v2.59.0
+# or via docker compose:
+docker compose build \
+  --build-arg LIBREALSENSE_VERSION=v2.59.0 \
+  --build-arg REALSENSE_ROS_VERSION=4.59.0 \
+  runtime
+```
+
+The SDK is built with the RSUSB (userspace) backend, so **no kernel module or
+kernel patching is required** on the host. A scheduled workflow
+(`.github/workflows/upstream-bump.yaml`) opens a bump PR when a newer upstream
+release appears.
 
 ### Smoke tests (test stages)
 
@@ -328,6 +353,8 @@ realsense_ros2/
 ├── script/
 │   ├── entrypoint.sh            # Container entrypoint (repo-owned)
 │   ├── install_udev_rules.sh    # Install RealSense udev rules on the host (repo-owned)
+│   ├── check_udev_rules_sync.sh # Check vendored udev rules vs pinned SDK tag (repo-owned)
+│   ├── bump_realsense_versions.sh # Bump pinned SDK/wrapper tags (repo-owned; drives upstream-bump)
 │   ├── build.sh -> ../.base/script/docker/wrapper/build.sh   # symlink
 │   ├── run.sh   -> ../.base/script/docker/wrapper/run.sh     # symlink
 │   ├── exec.sh  -> ../.base/script/docker/wrapper/exec.sh    # symlink
@@ -352,7 +379,8 @@ realsense_ros2/
 │   └── test/
 │       └── TEST.md             # automatic build-time smoke tests
 ├── .github/workflows/
-│   └── main.yaml                # CI (calls base reusable build/release workers)
+│   ├── main.yaml                # CI (calls base reusable build/release workers)
+│   └── upstream-bump.yaml       # Scheduled: open a bump PR on a new upstream release
 └── test/
     └── smoke/                   # repo-owned bats tests
         └── ros_env.bats         # (helper + more .bats come from .base/test/smoke/)

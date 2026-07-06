@@ -32,14 +32,18 @@ setup() {
 
 # -------------------- RealSense packages --------------------
 
-@test "realsense2_camera is installed" {
-    run dpkg -l ros-${ROS_DISTRO}-realsense2-camera
-    assert_success
+@test "realsense2_camera is discoverable via ament index (source build)" {
+    # #97: realsense2_camera is built from source (not apt), installed into
+    # /opt/ros/${ROS_DISTRO} via per-package `cmake --install`. Assert the
+    # ament index marker is present -- this is the exact class the runtime
+    # DESTDIR staging + COPY must preserve for `ros2 pkg prefix` to work.
+    assert [ -f "/opt/ros/${ROS_DISTRO}/share/ament_index/resource_index/packages/realsense2_camera" ]
 }
 
-@test "realsense2_description is installed" {
-    run dpkg -l ros-${ROS_DISTRO}-realsense2-description
-    assert_success
+@test "realsense2_description is discoverable via ament index (source build)" {
+    # #97: realsense2_description is bundled in the realsense-ros repo, so the
+    # source build covers it too. Same ament-marker check.
+    assert [ -f "/opt/ros/${ROS_DISTRO}/share/ament_index/resource_index/packages/realsense2_description" ]
 }
 
 @test "RealSense SDK tool libraries resolve (rs-enumerate-devices)" {

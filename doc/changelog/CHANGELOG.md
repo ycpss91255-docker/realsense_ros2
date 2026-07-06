@@ -6,6 +6,21 @@ versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ## [Unreleased]
 
 ### Added
+- `LIBREALSENSE_VERSION=v2.58.2` / `REALSENSE_ROS_VERSION=4.58.2` build-args
+  pinning the RealSense source build; override either with
+  `--build-arg` (e.g. `just build --build-arg LIBREALSENSE_VERSION=v2.59.0`).
+  Placed immediately before the compile RUN so unrelated edits stay
+  buildx-cache-hot and only a version bump recompiles (#97).
+- Scheduled `.github/workflows/upstream-bump.yaml` (weekly + `workflow_dispatch`)
+  that opens a `chore(deps)` PR when a newer librealsense / realsense-ros
+  release appears -- dependabot cannot see the ARG-embedded git tags, so this
+  is a bespoke Action driven by `script/bump_realsense_versions.sh`. A second
+  job runs `script/check_udev_rules_sync.sh` and annotates on drift (#97).
+- `script/check_udev_rules_sync.sh`: diffs the vendored
+  `config/realsense/99-realsense-libusb.rules` against upstream at the pinned
+  `LIBREALSENSE_VERSION`; a provenance/sync header on the rules file documents
+  the vendoring. The runtime smoke gains a `ros2 pkg prefix realsense2_camera`
+  ament-marker check (catches a missed marker from the source-build staging) (#97).
 - README **Multi-machine (ROS 2)** section (all 4 languages): consume the camera from another machine via DDS auto-discovery by setting a matching `ROS_DOMAIN_ID` in the `.env` workload overlay -- no master, no command-line flags, since `compose.yaml` injects `.env` via `env_file`. Documents the host-network / `ROS_LOCALHOST_ONLY` requirements and the best-effort-QoS frame-drop caveat. Verified across a Pi + host (~10 Hz over a direct link).
 - README TL;DR + Quick Start now demonstrate the actual RGB-D **app**: `just run
   -t runtime` launches the camera node, with a CLI check (`ros2 topic hz` on the
@@ -54,6 +69,22 @@ versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   repos.
 
 ### Changed
+- The `runtime` image now launches with `initial_reset:=true` by default: on the
+  RSUSB userspace backend, a D455 cold-start on arm64 could wedge the first
+  stream-open (`RS2_USB_STATUS_IO`, topics stuck at 0 Hz); resetting the device
+  at startup clears it. `runtime` CMD only (so `devel` is unaffected), and the
+  arg is overridable. Adds a few seconds to launch.
+- RealSense components are now built from pinned source (librealsense SDK +
+  realsense-ros wrapper) instead of apt. Removed the
+  `ros-<distro>-realsense2-camera` / `-realsense2-description` apt installs from
+  both `devel-base` and `runtime`; both now install into `/opt/ros/<distro>`
+  (the ament path is unchanged, so entrypoint / bashrc / smoke paths are
+  unchanged). `devel` compiles both at the pinned tags (with the SDK
+  `BUILD_EXAMPLES` tools + RViz plugin); `runtime` COPYs the built libs +
+  wrapper from `devel` (omission-proof per-package `cmake --install` DESTDIR
+  staging, `bin/` tools excluded) and resolves its exec ROS deps online via
+  `rosdep --dependency-types=exec --skip-keys=librealsense2`. The RSUSB
+  (userspace) backend is forced, so no kernel patching is needed (#97).
 - `runtime` image now aligns depth to colour by default: the default CMD switches
   from `rs_launch.py` to Intel's packaged `rs_align_depth_launch.py`, so a plain
   `just run -t runtime` additionally publishes
