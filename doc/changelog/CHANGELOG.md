@@ -6,6 +6,15 @@ versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ## [Unreleased]
 
 ### Added
+- Publish-time `test` stage in `docker/librealsense/Dockerfile` gating the
+  prebuilt librealsense SDK image: the publish workflow builds `--target test`
+  (`push: false`) BEFORE it pushes, so an SDK image whose `/rs-full` + `/rs-stage`
+  DESTDIR trees are malformed can never reach GHCR. The stage asserts both trees
+  exist, that `/rs-full` carries `librealsense2.so` with a fully-resolvable `ldd`
+  and a versioned soname (`librealsense2.so.<major.minor>`), and that `/rs-stage`
+  is correctly pruned (no `realsense-viewer`, no `rs-*` example tools, no
+  `librealsense2-gl`). This stage IS the correctness contract of the trees the
+  consumer COPYs (builds on #103).
 - `LIBREALSENSE_VERSION=v2.58.2` / `REALSENSE_ROS_VERSION=4.58.2` build-args
   pinning the RealSense source build; override either with
   `--build-arg` (e.g. `just build --build-arg LIBREALSENSE_VERSION=v2.59.0`).
@@ -69,6 +78,13 @@ versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   repos.
 
 ### Changed
+- The published prebuilt librealsense SDK image is now the slim `scratch`
+  `export` target -- literally just the `/rs-full` + `/rs-stage` DESTDIR trees a
+  consumer COPYs out -- instead of the fat `build` image (ros-base + the full
+  build toolchain underneath, which was dead weight since nothing runs the SDK
+  image). Drops the published image from ~1.2 GB to ~90 MB. The publish
+  workflow's build-and-push step now targets `export`; the trees are at the same
+  paths, so any `COPY --from` against the image is unchanged (builds on #103).
 - The `runtime` image now launches with `initial_reset:=true` by default: on the
   RSUSB userspace backend, a D455 cold-start on arm64 could wedge the first
   stream-open (`RS2_USB_STATUS_IO`, topics stuck at 0 Hz); resetting the device
