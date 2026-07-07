@@ -117,9 +117,24 @@ RUN apt-get update && \
         # tools such as realsense-viewer and rviz2 need. The runtime image
         # stays on ros-base (this is in devel-base, not the runtime branch).
         ros-${ROS_DISTRO}-desktop \
-        # RealSense packages
-        ros-${ROS_DISTRO}-realsense2-camera \
-        ros-${ROS_DISTRO}-realsense2-description \
+        # RealSense source-build deps (#97). librealsense + realsense-ros are
+        # compiled from pinned source in the devel stage instead of apt, so the
+        # ros-${ROS_DISTRO}-realsense2-* packages are gone from here; these are
+        # Intel's official Ubuntu build-dep list plus colcon/rosdep for the
+        # wrapper. The GUI libs (libgtk-3/glfw3/gl1-mesa/glu1-mesa) back the
+        # devel-only -DBUILD_GRAPHICAL_EXAMPLES (realsense-viewer + rs-* tools).
+        build-essential \
+        cmake \
+        pkg-config \
+        libssl-dev \
+        libusb-1.0-0-dev \
+        libudev-dev \
+        libgtk-3-dev \
+        libglfw3-dev \
+        libgl1-mesa-dev \
+        libglu1-mesa-dev \
+        python3-colcon-common-extensions \
+        python3-rosdep \
         && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
@@ -176,6 +191,12 @@ RUN arch="$(dpkg --print-architecture)" && \
 ############################## devel ##############################
 FROM devel-base AS devel
 
+# ROS_DISTRO is declared per-stage in a multi-stage build; without re-declaring
+# it here the ${ROS_DISTRO} expansions below (install prefix, colcon rosdistro,
+# staging paths) would be empty and the SDK/wrapper would land in /opt/ros//
+# (#97).
+ARG ROS_DISTRO
+
 ARG USER_NAME="user"
 ARG USER_GROUP="user"
 ARG USER="${USER_NAME}"
@@ -184,6 +205,66 @@ ARG ENTRYPOINT_FILE="script/entrypoint.sh"
 ARG CONFIG_DIR="/tmp/config"
 ARG SETUP_DIR="/tmp/setup"
 ARG CONFIG_SRC="config"
+
+# Build the RealSense stack from pinned source (#97). Pinned, distro-agnostic
+# (the same tags build on humble+jazzy), and --build-arg overridable. Placed
+# immediately before the compile RUN so edits above stay buildx-cache-hot and
+# only a version bump recompiles. NOT floating `latest` -- reproducible builds.
+ARG LIBREALSENSE_VERSION="v2.58.2"
+ARG REALSENSE_ROS_VERSION="4.58.2"
+
+# Compile librealsense (SDK) then realsense-ros (wrapper) and install both into
+# /opt/ros/${ROS_DISTRO}, mirroring what the apt packages did (verified via
+# `dpkg -L`), so the base setup.bash discovers them through the ament index and
+# entrypoint/bashrc/smoke paths stay unchanged. LIVE install feeds the devel
+# image (viewer + rs-* tools); a parallel DESTDIR=/opt/rs-stage per-package
+# `cmake --install` stages an omission-proof copy tree for runtime's
+# COPY --from=devel. We deliberately do NOT use colcon's prefix-level
+# setup.bash (it would clobber the base image's /opt/ros/<distro>/setup.bash);
+# per-package `cmake --install` still captures the ament markers
+# (share/ament_index/resource_index/packages/realsense2_*). The wrapper's
+# package.xml files are preserved under /opt/rs-stage-src for runtime's online
+# exec-dep resolution. FORCE_RSUSB_BACKEND => userspace, so NO kernel patching.
+# `. "${prefix}/setup.bash"` below sources a ROS-generated file that hadolint's
+# shellcheck cannot follow; ROS setup.bash is not a repo file (SC1091).
+# hadolint ignore=SC1091
+RUN prefix="/opt/ros/${ROS_DISTRO}" && \
+    stage="/opt/rs-stage" && \
+    git clone --depth 1 --branch "${LIBREALSENSE_VERSION}" \
+        https://github.com/IntelRealSense/librealsense.git /tmp/librealsense && \
+    cmake -S /tmp/librealsense -B /tmp/librealsense/build \
+        -DCMAKE_INSTALL_PREFIX="${prefix}" \
+        -DCMAKE_BUILD_TYPE=Release \
+        -DFORCE_RSUSB_BACKEND=true \
+        -DBUILD_WITH_DDS=OFF \
+        -DCHECK_FOR_UPDATES=OFF \
+        -DBUILD_PYTHON_BINDINGS=false \
+        -DBUILD_WITH_CUDA=false \
+        -DBUILD_EXAMPLES=true \
+        -DBUILD_GRAPHICAL_EXAMPLES=true && \
+    cmake --build /tmp/librealsense/build -j"$(nproc)" && \
+    cmake --install /tmp/librealsense/build && \
+    DESTDIR="${stage}" cmake --install /tmp/librealsense/build && \
+    mkdir -p /tmp/rs_ws/src && \
+    git clone --depth 1 --branch "${REALSENSE_ROS_VERSION}" \
+        https://github.com/IntelRealSense/realsense-ros.git /tmp/rs_ws/src/realsense-ros && \
+    apt-get update && \
+    (rosdep init 2>/dev/null || true) && \
+    rosdep update && \
+    rosdep install -i --from-path /tmp/rs_ws/src --rosdistro "${ROS_DISTRO}" \
+        --skip-keys=librealsense2 -y && \
+    set +u && . "${prefix}/setup.bash" && set -u && \
+    colcon build --base-paths /tmp/rs_ws/src --build-base /tmp/rs_ws/build \
+        --install-base /tmp/rs_ws/install \
+        --cmake-args \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DBUILD_WITH_DDS=OFF && \
+    for b in /tmp/rs_ws/build/*/; do \
+        cmake --install "${b}" --prefix "${prefix}" && \
+        DESTDIR="${stage}" cmake --install "${b}" --prefix "${prefix}"; \
+    done && \
+    cp -r /tmp/rs_ws/src /opt/rs-stage-src && \
+    rm -rf /tmp/librealsense /tmp/rs_ws /var/lib/apt/lists/*
 
 COPY --chmod=0755 "./${ENTRYPOINT_FILE}" "/entrypoint.sh"
 COPY --chown="${USER}":"${GROUP}" --chmod=0755 .base/config "${CONFIG_DIR}"
@@ -269,6 +350,9 @@ RUN apt-get update && \
     apt-get install -y --no-install-recommends \
         sudo \
         tini \
+        # rosdep resolves runtime's exec ROS deps online against the wrapper
+        # package.xml copied from devel (#97).
+        python3-rosdep \
         && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
@@ -280,19 +364,36 @@ ARG ROS_DISTRO
 ARG USER_NAME="user"
 ARG USER="${USER_NAME}"
 
-# Runtime ROS packages. Also append a ROS source to /etc/bash.bashrc so
-# interactive `docker exec` shells get `ros2` on PATH: the entrypoint sources ROS
-# for PID 1 (the launched app) only and `docker exec` bypasses the entrypoint.
-# /etc/bash.bashrc is read by interactive shells only (its leading non-interactive
-# guard short-circuits otherwise), so non-interactive correctness is untouched
-# and -- unlike baking ROS into ENV -- it is not arch-/python-version fragile.
-# devel already does this via its bashrc.d drop-in (base#657, #87). Folded into
-# this RUN (not a separate one) to avoid a consecutive-RUN lint (DL3059).
-RUN apt-get update && \
-    apt-get install -y --no-install-recommends \
-        ros-${ROS_DISTRO}-realsense2-camera \
-        ros-${ROS_DISTRO}-realsense2-description \
-        && \
+# RealSense libs + wrapper, staged from the devel source build (#97). Copy only
+# the SDK/wrapper libs (lib/) and the ament-indexed resources (share/); the
+# bin/ SDK tools (realsense-viewer, rs-*) are deliberately omitted from runtime.
+# Install into /opt/ros/${ROS_DISTRO} exactly where apt put them, so the base
+# setup.bash discovers the packages via the ament index -- entrypoint/bashrc/
+# smoke paths unchanged. /tmp/rs-src holds ONLY the wrapper package.xml (not the
+# whole ros share tree) so runtime's rosdep scans just those manifests.
+COPY --from=devel /opt/rs-stage/opt/ros/${ROS_DISTRO}/lib/   /opt/ros/${ROS_DISTRO}/lib/
+COPY --from=devel /opt/rs-stage/opt/ros/${ROS_DISTRO}/share/ /opt/ros/${ROS_DISTRO}/share/
+COPY --from=devel /opt/rs-stage-src                          /tmp/rs-src
+
+# Resolve the wrapper's exec ROS deps online (image_transport,
+# diagnostic_updater, ...) -- they are missing from ros-base once the apt
+# realsense meta is gone. --dependency-types=exec (runtime needs only exec
+# deps) and --skip-keys=librealsense2 (do NOT let rosdep apt-install the SDK we
+# built from source; SONAME librealsense2.so.2.58 would collide). Also append a
+# ROS source to /etc/bash.bashrc so interactive `docker exec` shells get `ros2`
+# on PATH: the entrypoint sources ROS for PID 1 only and `docker exec` bypasses
+# it. /etc/bash.bashrc is read by interactive shells only (its leading
+# non-interactive guard short-circuits otherwise), so non-interactive
+# correctness is untouched. devel already does this via its bashrc.d drop-in
+# (base#657, #87). Folded into one RUN to avoid a consecutive-RUN lint (DL3059).
+RUN rm -f /opt/ros/"${ROS_DISTRO}"/lib/librealsense2-gl* && \
+    apt-get update && \
+    (rosdep init 2>/dev/null || true) && \
+    rosdep update && \
+    rosdep install -i --from-path /tmp/rs-src --rosdistro "${ROS_DISTRO}" \
+        --dependency-types=exec --skip-keys=librealsense2 -y && \
+    rm -rf /tmp/rs-src && \
+    ldconfig && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/* && \
     printf 'source /opt/ros/%s/setup.bash\n' "${ROS_DISTRO}" >> /etc/bash.bashrc
@@ -309,7 +410,10 @@ WORKDIR "${HOME}/work"
 EXPOSE 22
 
 ENTRYPOINT ["/entrypoint.sh"]
-CMD ["ros2", "launch", "realsense2_camera", "rs_align_depth_launch.py"]
+# initial_reset:=true resets the camera at startup so a D455 cold-start on the
+# RSUSB/arm64 backend does not wedge the first stream-open (RS2_USB_STATUS_IO,
+# topics stuck at 0 Hz). Adds a few seconds; override the arg to skip.
+CMD ["ros2", "launch", "realsense2_camera", "rs_align_depth_launch.py", "initial_reset:=true"]
 
 ############################## runtime-test (ephemeral) ##############################
 # Install-check smoke for the runtime image (template v0.21.1+ #243).
@@ -330,6 +434,7 @@ FROM runtime AS runtime-test
 
 ARG RUNTIME_SMOKE_CMD='whoami && bash --version && \
   source /opt/ros/${ROS_DISTRO}/setup.bash && \
+  ros2 pkg prefix realsense2_camera >/dev/null || { echo "RUNTIME SMOKE FAIL: realsense2_camera ament marker missing"; exit 1; } && \
   rs_dir="/opt/ros/${ROS_DISTRO}/lib/realsense2_camera" && \
   test -d "${rs_dir}" && \
   bins="$(find "${rs_dir}" -maxdepth 1 \( -type f -o -type l \))" && \

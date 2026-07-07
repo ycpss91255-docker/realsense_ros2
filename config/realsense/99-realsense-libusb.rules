@@ -1,3 +1,16 @@
+# VENDORED FILE -- do not hand-edit the rules below.
+#
+# This file is vendored from IntelRealSense/librealsense at the SDK tag pinned
+# in the Dockerfile ARG LIBREALSENSE_VERSION (config/99-realsense-libusb.rules
+# upstream). It is committed here -- rather than only baked into the image --
+# because host-side setup (script/install_udev_rules.sh) installs it into the
+# host's /etc/udev/rules.d/ outside Docker: the container has no udevd, so the
+# camera cannot enumerate with the right permissions without the host rules.
+#
+# Keep it in sync with the pinned SDK tag: script/check_udev_rules_sync.sh (run
+# locally or by the .github/workflows/upstream-bump.yaml schedule) diffs this
+# copy against upstream at LIBREALSENSE_VERSION and flags drift. When bumping
+# the SDK tag, re-vendor this file from upstream if the check reports a diff.
 ##Version=1.1##
 # Device rules for Intel RealSense devices (R200, F200, SR300 LR200, ZR300, D400, L500, T200)
 SUBSYSTEMS=="usb", ATTRS{idVendor}=="8086", ATTRS{idProduct}=="0a80", MODE:="0666", GROUP:="plugdev", RUN+="/usr/local/bin/usb-R200-in_udev"

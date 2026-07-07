@@ -6,7 +6,7 @@
 
 ## TL;DR
 
-コンテナ化された ROS 2 RealSense カメラ **アプリ**：`runtime` イメージのデフォルト CMD がカメラノードを launch し、リアルタイムの **RGB + Depth** トピックを配信します。apt から `realsense2-camera` と `realsense2-description` をインストールし（これにより `librealsense2` が依存関係として推移的に取り込まれます）、USB アクセス用の udev ルールを同梱します。マルチディストロ（Humble + Jazzy）、マルチアーキ（x86_64 + ARM64 / Raspberry Pi）。
+コンテナ化された ROS 2 RealSense カメラ **アプリ**：`runtime` イメージのデフォルト CMD がカメラノードを launch し、リアルタイムの **RGB + Depth** トピックを配信します。**ピン留めしたソースから librealsense（SDK）+ realsense-ros をビルド**し（`LIBREALSENSE_VERSION` / `REALSENSE_ROS_VERSION`）、`/opt/ros/<distro>` にインストールし、USB アクセス用の udev ルールを同梱します。マルチディストロ（Humble + Jazzy）、マルチアーキ（x86_64 + ARM64 / Raspberry Pi）。
 
 ```bash
 ./script/install_udev_rules.sh      # once on the host (physical camera)
@@ -36,12 +36,12 @@ just build && just run -t runtime    # build + launch the camera app
 
 ## 概要
 
-Intel RealSense 深度カメラ向けに、再現可能な ROS 2 環境を提供します。CI は **ROS 2 Humble（Ubuntu 22.04）と Jazzy（Ubuntu 24.04）の両方** でイメージをビルドし、それぞれ対応する `ros-<distro>-realsense2-camera` と `ros-<distro>-realsense2-description` パッケージを ROS 2 apt リポジトリからインストールします（`librealsense2` ライブラリはその依存関係として推移的に取り込まれます）。さらに上流の udev ルールを焼き込んでいるため、USB デバイスがコンテナ内で正しい権限のもとで起動します。マルチアーキテクチャのベースイメージは x86_64 と ARM64（Raspberry Pi、Jetson CPU モード）をサポートします。
+Intel RealSense 深度カメラ向けに、再現可能な ROS 2 環境を提供します。CI は **ROS 2 Humble（Ubuntu 22.04）と Jazzy（Ubuntu 24.04）の両方** でイメージをビルドし、それぞれ **librealsense SDK と realsense-ros wrapper をピン留めしたソースからビルド**し（`LIBREALSENSE_VERSION` / `REALSENSE_ROS_VERSION`）、両方を `/opt/ros/<distro>` にインストールします（従来 apt パッケージが配置していた場所と同じため、ament index が overlay なしで検出します）。さらに上流の udev ルールを焼き込んでいるため、USB デバイスがコンテナ内で正しい権限のもとで起動します。マルチアーキテクチャのベースイメージは x86_64 と ARM64（Raspberry Pi、Jetson CPU モード）をサポートします。
 
 ## 機能
 
 - **マルチディストロ**：CI が単一の Dockerfile から ROS 2 Humble（Ubuntu 22.04）と Jazzy（Ubuntu 24.04）をビルド
-- **Apt ベースのインストール**：ROS 2 apt リポジトリから `realsense2-camera` と `realsense2-description`（`librealsense2` は推移的に取り込まれる）
+- **ソースビルド（ピン留め）**：librealsense + realsense-ros をピン留めした tag（`LIBREALSENSE_VERSION` / `REALSENSE_ROS_VERSION`）からコンパイル；`--build-arg` で上書き可能
 - **Smoke Test**：Bats テストがビルド時に自動実行され、環境を検証
 - **Docker Compose**：単一の `compose.yaml` で全ターゲットを管理
 - **udev ルール**：RealSense USB デバイスアクセス用に事前設定済み
@@ -159,6 +159,32 @@ docker compose build \
   --build-arg UBUNTU_CODENAME=noble \
   runtime
 ```
+
+### RealSense ソースバージョンのピン留め
+
+librealsense SDK と realsense-ros wrapper はいずれも **ピン留めした git tag** から
+コンパイルされます（apt ではありません）。そのためビルドは再現可能で、上流の
+リグレッションを自動的に取り込むこともありません。2 つの build-arg がこれらの
+tag を保持します（デフォルト値は Dockerfile 内）：
+
+- `LIBREALSENSE_VERSION`（デフォルト `v2.58.2`）—— IntelRealSense/librealsense tag
+- `REALSENSE_ROS_VERSION`（デフォルト `4.58.2`）—— IntelRealSense/realsense-ros tag
+
+ビルド時にいずれかを上書きします：
+
+```bash
+just build --build-arg LIBREALSENSE_VERSION=v2.59.0
+# または docker compose 経由：
+docker compose build \
+  --build-arg LIBREALSENSE_VERSION=v2.59.0 \
+  --build-arg REALSENSE_ROS_VERSION=4.59.0 \
+  runtime
+```
+
+SDK は RSUSB（userspace）backend でビルドされるため、ホストに **kernel module や
+kernel patch は不要** です。スケジュール workflow
+（`.github/workflows/upstream-bump.yaml`）が新しい上流 release を検出すると bump
+PR を開きます。
 
 ### Smoke tests（test ステージ）
 
@@ -328,6 +354,8 @@ realsense_ros2/
 ├── script/
 │   ├── entrypoint.sh            # コンテナエントリポイント（リポジトリ所有）
 │   ├── install_udev_rules.sh    # ホストに RealSense udev ルールをインストール（リポジトリ所有）
+│   ├── check_udev_rules_sync.sh # vendored udev ルールとピン留め SDK tag の同期を確認（リポジトリ所有）
+│   ├── bump_realsense_versions.sh # ピン留め SDK/wrapper tag を更新（リポジトリ所有；upstream-bump を駆動）
 │   ├── build.sh -> ../.base/script/docker/wrapper/build.sh   # シンボリックリンク
 │   ├── run.sh   -> ../.base/script/docker/wrapper/run.sh     # シンボリックリンク
 │   ├── exec.sh  -> ../.base/script/docker/wrapper/exec.sh    # シンボリックリンク
@@ -352,7 +380,8 @@ realsense_ros2/
 │   └── test/
 │       └── TEST.md             # ビルド時の自動 smoke テスト
 ├── .github/workflows/
-│   └── main.yaml                # CI（base の再利用可能な build/release ワーカーを呼び出す）
+│   ├── main.yaml                # CI（base の再利用可能な build/release ワーカーを呼び出す）
+│   └── upstream-bump.yaml       # スケジュール：新しい上流 release で bump PR を開く
 └── test/
     └── smoke/                   # リポジトリ所有の bats テスト
         └── ros_env.bats         # （ヘルパーと追加の .bats は .base/test/smoke/ から）

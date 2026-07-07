@@ -6,7 +6,7 @@
 
 ## TL;DR
 
-容器化的 Intel RealSense ROS 2 相機 **app**：`runtime` 映像的預設指令會 launch 相機節點，並發布即時 **RGB + Depth** topic。透過 apt 安裝 `realsense2-camera` / `realsense2-description`（連帶拉入 `librealsense2`），並內含供 USB 存取的 udev 規則。多發行版（Humble + Jazzy）、多架構（x86_64 + ARM64 / Raspberry Pi）。
+容器化的 Intel RealSense ROS 2 相機 **app**：`runtime` 映像的預設指令會 launch 相機節點，並發布即時 **RGB + Depth** topic。從**釘選的原始碼建置 librealsense（SDK）+ realsense-ros**（`LIBREALSENSE_VERSION` / `REALSENSE_ROS_VERSION`），安裝到 `/opt/ros/<distro>`，並內含供 USB 存取的 udev 規則。多發行版（Humble + Jazzy）、多架構（x86_64 + ARM64 / Raspberry Pi）。
 
 ```bash
 ./script/install_udev_rules.sh      # once on the host (physical camera)
@@ -36,12 +36,12 @@ just build && just run -t runtime    # build + launch the camera app
 
 ## 概觀
 
-提供可重現的 ROS 2 環境，供 Intel RealSense 深度相機使用。CI 會同時為 **ROS 2 Humble（Ubuntu 22.04）與 Jazzy（Ubuntu 24.04）** 建置映像；各版本會從 ROS 2 apt 套件庫安裝對應的 `ros-<distro>-realsense2-camera` 與 `ros-<distro>-realsense2-description` 套件（`librealsense2` 函式庫會以相依關係連帶拉入），並內建上游 udev 規則，讓 USB 裝置在容器內以正確的權限掛載。多架構基底映像支援 x86_64 與 ARM64（Raspberry Pi、Jetson CPU 模式）。
+提供可重現的 ROS 2 環境，供 Intel RealSense 深度相機使用。CI 會同時為 **ROS 2 Humble（Ubuntu 22.04）與 Jazzy（Ubuntu 24.04）** 建置映像；各版本會**從釘選的原始碼建置 librealsense SDK 與 realsense-ros wrapper**（`LIBREALSENSE_VERSION` / `REALSENSE_ROS_VERSION`），並將兩者安裝到 `/opt/ros/<distro>`（與過去 apt 套件的落點相同，因此 ament index 無需 overlay 即可探索）。映像內建上游 udev 規則，讓 USB 裝置在容器內以正確的權限掛載。多架構基底映像支援 x86_64 與 ARM64（Raspberry Pi、Jetson CPU 模式）。
 
 ## 功能特色
 
 - **多發行版**：CI 以單一 Dockerfile 建置 ROS 2 Humble（Ubuntu 22.04）與 Jazzy（Ubuntu 24.04）
-- **Apt 安裝**：從 ROS 2 apt 套件庫安裝 `realsense2-camera` 和 `realsense2-description`（`librealsense2` 以相依關係連帶拉入）
+- **原始碼建置（釘選版本）**：librealsense + realsense-ros 由釘選的 tag（`LIBREALSENSE_VERSION` / `REALSENSE_ROS_VERSION`）編譯；可用 `--build-arg` 覆寫
 - **Smoke Test**：Bats 測試在建置時自動執行，驗證環境正確性
 - **Docker Compose**：單一 `compose.yaml` 管理所有目標
 - **udev 規則**：預先設定 RealSense USB 裝置存取權限
@@ -156,6 +156,30 @@ docker compose build \
   --build-arg UBUNTU_CODENAME=noble \
   runtime
 ```
+
+### 釘選 RealSense 原始碼版本
+
+librealsense SDK 與 realsense-ros wrapper 皆從**釘選的 git tag** 編譯（非 apt），
+因此建置可重現，也不會自動帶入上游的回歸問題。兩個 build-arg 保存這些 tag
+（預設值位於 Dockerfile）：
+
+- `LIBREALSENSE_VERSION`（預設 `v2.58.2`）—— IntelRealSense/librealsense tag
+- `REALSENSE_ROS_VERSION`（預設 `4.58.2`）—— IntelRealSense/realsense-ros tag
+
+在建置時覆寫其中之一：
+
+```bash
+just build --build-arg LIBREALSENSE_VERSION=v2.59.0
+# 或透過 docker compose：
+docker compose build \
+  --build-arg LIBREALSENSE_VERSION=v2.59.0 \
+  --build-arg REALSENSE_ROS_VERSION=4.59.0 \
+  runtime
+```
+
+SDK 以 RSUSB（userspace）backend 建置，因此 host **不需要 kernel module 或
+kernel patch**。排程 workflow（`.github/workflows/upstream-bump.yaml`）會在有新的
+上游 release 時開啟 bump PR。
 
 ### Smoke tests（test 階段）
 
@@ -316,6 +340,8 @@ realsense_ros2/
 ├── script/
 │   ├── entrypoint.sh            # 容器進入點（repo 自有）
 │   ├── install_udev_rules.sh    # 在 host 安裝 RealSense udev 規則（repo 自有）
+│   ├── check_udev_rules_sync.sh # 檢查 vendored udev 規則與釘選 SDK tag 是否同步（repo 自有）
+│   ├── bump_realsense_versions.sh # 更新釘選的 SDK/wrapper tag（repo 自有；驅動 upstream-bump）
 │   ├── build.sh -> ../.base/script/docker/wrapper/build.sh   # symlink
 │   ├── run.sh   -> ../.base/script/docker/wrapper/run.sh     # symlink
 │   ├── exec.sh  -> ../.base/script/docker/wrapper/exec.sh    # symlink
@@ -340,7 +366,8 @@ realsense_ros2/
 │   └── test/
 │       └── TEST.md             # 建置期自動 smoke 測試
 ├── .github/workflows/
-│   └── main.yaml                # CI（呼叫 base 的 reusable build/release worker）
+│   ├── main.yaml                # CI（呼叫 base 的 reusable build/release worker）
+│   └── upstream-bump.yaml       # 排程：有新上游 release 時開啟 bump PR
 └── test/
     └── smoke/                   # repo 自有的 bats 測試
         └── ros_env.bats         # （helper 與更多 .bats 來自 .base/test/smoke/）
