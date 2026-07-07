@@ -364,6 +364,10 @@ realsense_ros2/
 │   ├── setup.sh -> ../.base/script/docker/wrapper/setup.sh   # シンボリックリンク
 │   ├── setup_tui.sh -> ../.base/script/docker/wrapper/setup_tui.sh  # シンボリックリンク
 │   └── hooks/                   # pre/ + post/ ラッパーフック
+│       └── pre/build.sh         # librealsense:local を自動ビルドし、ローカルビルドを自己完結にする（repo 所有）
+├── docker/
+│   └── librealsense/
+│       └── Dockerfile           # プレビルド librealsense SDK ソース image（ローカル：pre-build hook／CI：GHCR へ公開）
 ├── config/
 │   ├── docker/
 │   │   └── setup.conf           # 設定サーフェス（.env/compose.yaml はここから生成）
@@ -381,6 +385,7 @@ realsense_ros2/
 │       └── TEST.md             # ビルド時の自動 smoke テスト
 ├── .github/workflows/
 │   ├── main.yaml                # CI（base の再利用可能な build/release ワーカーを呼び出す）
+│   ├── build-librealsense.yaml  # プレビルド librealsense SDK image（humble/jazzy）を GHCR へ公開
 │   └── upstream-bump.yaml       # スケジュール：新しい上流 release で bump PR を開く
 └── test/
     └── smoke/                   # リポジトリ所有の bats テスト

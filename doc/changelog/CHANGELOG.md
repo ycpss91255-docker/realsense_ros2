@@ -6,15 +6,19 @@ versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ## [Unreleased]
 
 ### Added
-- Publish-time `test` stage in `docker/librealsense/Dockerfile` gating the
-  prebuilt librealsense SDK image: the publish workflow builds `--target test`
-  (`push: false`) BEFORE it pushes, so an SDK image whose `/rs-full` + `/rs-stage`
-  DESTDIR trees are malformed can never reach GHCR. The stage asserts both trees
-  exist, that `/rs-full` carries `librealsense2.so` with a fully-resolvable `ldd`
-  and a versioned soname (`librealsense2.so.<major.minor>`), and that `/rs-stage`
-  is correctly pruned (no `realsense-viewer`, no `rs-*` example tools, no
-  `librealsense2-gl`). This stage IS the correctness contract of the trees the
-  consumer COPYs (builds on #103).
+- `script/hooks/pre/build.sh` (base #440 pre-build hook): for a local
+  `just build` / `./build.sh` (with `LIBREALSENSE_IMAGE` unset) it auto-builds
+  `librealsense:local` from `docker/librealsense/Dockerfile` before the main
+  build, mirroring how `build.sh` auto-builds `test-tools:local`. The local
+  build is now self-contained -- no GHCR pull needed. If `LIBREALSENSE_IMAGE`
+  is already set (CI passes the GHCR tag) the hook is a no-op.
+- `docker/librealsense/Dockerfile` gains a `test` stage (publish-time smoke
+  GATE: asserts the `/rs-full` + `/rs-stage` trees exist, `librealsense2.so` is
+  present and fully linkable with no `not found`, the versioned soname is
+  present, and `/rs-stage` is pruned of the viewer / `rs-*` tools / GL lib) and
+  a `scratch`-based `export` stage. `build-librealsense.yaml` now builds
+  `--target test` (push=false) as a gate BEFORE publishing, so a broken SDK
+  never reaches GHCR.
 - `LIBREALSENSE_VERSION=v2.58.2` / `REALSENSE_ROS_VERSION=4.58.2` build-args
   pinning the RealSense source build; override either with
   `--build-arg` (e.g. `just build --build-arg LIBREALSENSE_VERSION=v2.59.0`).
@@ -78,13 +82,20 @@ versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   repos.
 
 ### Changed
-- The published prebuilt librealsense SDK image is now the slim `scratch`
-  `export` target -- literally just the `/rs-full` + `/rs-stage` DESTDIR trees a
-  consumer COPYs out -- instead of the fat `build` image (ros-base + the full
-  build toolchain underneath, which was dead weight since nothing runs the SDK
-  image). Drops the published image from ~1.2 GB to ~90 MB. The publish
-  workflow's build-and-push step now targets `export`; the trees are at the same
-  paths, so any `COPY --from` against the image is unchanged (builds on #103).
+- librealsense is now consumed from a parameterized prebuilt SDK image instead
+  of compiled inline in the main `devel` stage. The main Dockerfile adds a
+  global `ARG LIBREALSENSE_IMAGE="librealsense:local"` + `FROM ${LIBREALSENSE_IMAGE}
+  AS rs_sdk` and COPYs the prebuilt `/rs-full` + `/rs-stage` trees in before the
+  colcon wrapper build (which is unchanged), dropping the ~15-25 min
+  librealsense compile from every build. This mirrors base's `TEST_TOOLS_IMAGE`
+  dual-source pattern: local builds FROM `librealsense:local` (built by the
+  pre-build hook, no GHCR), CI passes
+  `LIBREALSENSE_IMAGE=ghcr.io/ycpss91255-docker/librealsense:<distro>-v2.58.2`
+  per matrix distro so buildx PULLS the prebuilt SDK. `main.yaml` wires the
+  per-distro tag through `build_args`.
+- The published `librealsense` SDK image is now the slim `scratch`-based
+  `export` target -- literally just the `/rs-full` + `/rs-stage` trees, with the
+  ROS base + build-deps dropped (the consumer only COPYs those trees).
 - The `runtime` image now launches with `initial_reset:=true` by default: on the
   RSUSB userspace backend, a D455 cold-start on arm64 could wedge the first
   stream-open (`RS2_USB_STATUS_IO`, topics stuck at 0 Hz); resetting the device

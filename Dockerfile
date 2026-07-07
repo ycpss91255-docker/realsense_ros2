@@ -1,6 +1,12 @@
 ARG ROS_DISTRO="humble"
 ARG ROS_TAG="ros-base"
 ARG UBUNTU_CODENAME="jammy"
+# librealsense SDK pin. Declared before the first FROM so the `rs_sdk` stage's
+# FROM tag can reference it (FROM-line ARGs must be global or pre-FROM). The
+# prebuilt per-distro SDK images (humble-${LIBREALSENSE_VERSION},
+# jazzy-${LIBREALSENSE_VERSION}) are produced by
+# .github/workflows/build-librealsense.yaml and consumed below via `rs_sdk`.
+ARG LIBREALSENSE_VERSION="v2.58.2"
 # Pre-built lint + bats tools image (ShellCheck, Hadolint, Bats + the
 # bats-support/assert/mock extensions). Resolves to `test-tools:local` for the
 # local `just build` flow (build.sh auto-builds it from
@@ -12,6 +18,29 @@ ARG UBUNTU_CODENAME="jammy"
 # (instead of self-building the tools) is the template's canonical pattern
 # (Dockerfile.example); see the sibling app/ros1_bridge for the same setup.
 ARG TEST_TOOLS_IMAGE="test-tools:local"
+# Prebuilt librealsense SDK source image, mirroring TEST_TOOLS_IMAGE's
+# dual-source pattern. Resolves to `librealsense:local` for the local
+# `just build` / `./build.sh` flow (the pre-build hook
+# script/hooks/pre/build.sh auto-builds it from docker/librealsense/Dockerfile
+# when LIBREALSENSE_IMAGE is unset -> self-contained, no GHCR needed), or to
+# the multi-arch ghcr.io/ycpss91255-docker/librealsense:${ROS_DISTRO}-${LIBREALSENSE_VERSION}
+# in CI (main.yaml passes it as a build-arg so buildx PULLS the prebuilt SDK
+# instead of recompiling librealsense ~15-25 min per run). Both the GHCR export
+# image and the local image expose the two trees at /rs-full and /rs-stage.
+ARG LIBREALSENSE_IMAGE="librealsense:local"
+
+############################## rs_sdk ##############################
+# Prebuilt librealsense SDK (issue #97 / option B). Compiled ONCE per distro by
+# .github/workflows/build-librealsense.yaml and published to GHCR, so CI no
+# longer recompiles librealsense (~15-25 min) on every run -- it just pulls the
+# matching distro image and COPYs the pre-built trees into the wrapper build
+# below. The image carries two DESTDIR trees: /rs-full (full SDK: viewer + rs-*
+# + gl) and /rs-stage (tools-pruned, for the runtime overlay). Multi-arch, so
+# the tag resolves the matching variant per build platform. The source is
+# parameterized via LIBREALSENSE_IMAGE (see the ARG above): a local build FROMs
+# librealsense:local, CI FROMs the GHCR tag.
+# hadolint ignore=DL3006
+FROM ${LIBREALSENSE_IMAGE} AS rs_sdk
 
 ############################## sys ##############################
 FROM ros:${ROS_DISTRO}-${ROS_TAG}-${UBUNTU_CODENAME} AS sys
@@ -206,14 +235,28 @@ ARG CONFIG_DIR="/tmp/config"
 ARG SETUP_DIR="/tmp/setup"
 ARG CONFIG_SRC="config"
 
-# Build the RealSense stack from pinned source (#97). Pinned, distro-agnostic
-# (the same tags build on humble+jazzy), and --build-arg overridable. Placed
-# immediately before the compile RUN so edits above stay buildx-cache-hot and
-# only a version bump recompiles. NOT floating `latest` -- reproducible builds.
-ARG LIBREALSENSE_VERSION="v2.58.2"
+# The realsense-ros wrapper pin (#97). Pinned, distro-agnostic (the same tag
+# builds on humble+jazzy), and --build-arg overridable. Placed immediately
+# before the wrapper build RUN so edits above stay buildx-cache-hot and only a
+# version bump recompiles. NOT floating `latest` -- reproducible builds. The
+# librealsense SDK pin lives in the global LIBREALSENSE_VERSION ARG at the top
+# (the `rs_sdk` FROM must reference it pre-FROM).
 ARG REALSENSE_ROS_VERSION="4.58.2"
 
-# Compile librealsense (SDK) then realsense-ros (wrapper) and install both into
+# COPY the prebuilt SDK trees in BEFORE the wrapper build (issue #97).
+# librealsense is now consumed as a PREBUILT GHCR image (the `rs_sdk` stage at
+# the top), not compiled here -- CI no longer pays the ~15-25 min librealsense
+# compile per run, only the colcon wrapper build. The full SDK (viewer + rs-* +
+# gl) overlays the devel ROS prefix (mirrors the apt layout: entrypoint/paths
+# unchanged, find_package(realsense2) resolves it); the tools-pruned copy stages
+# at /opt/rs-stage for the runtime overlay. The SDK was built with
+# FORCE_RSUSB_BACKEND=true (userspace, no kernel module -- the whole point for
+# the Pi) and no Python bindings (see docker/librealsense/Dockerfile).
+COPY --from=rs_sdk /rs-full/opt/ros/${ROS_DISTRO} /opt/ros/${ROS_DISTRO}
+COPY --from=rs_sdk /rs-stage/opt/ros/${ROS_DISTRO} /opt/rs-stage/opt/ros/${ROS_DISTRO}
+
+# ldconfig registers the copied librealsense .so, then realsense-ros (wrapper)
+# is built with colcon against the prebuilt SDK and installed into
 # /opt/ros/${ROS_DISTRO}, mirroring what the apt packages did (verified via
 # `dpkg -L`), so the base setup.bash discovers them through the ament index and
 # entrypoint/bashrc/smoke paths stay unchanged. LIVE install feeds the devel
@@ -230,21 +273,7 @@ ARG REALSENSE_ROS_VERSION="4.58.2"
 # hadolint ignore=SC1091
 RUN prefix="/opt/ros/${ROS_DISTRO}" && \
     stage="/opt/rs-stage" && \
-    git clone --depth 1 --branch "${LIBREALSENSE_VERSION}" \
-        https://github.com/IntelRealSense/librealsense.git /tmp/librealsense && \
-    cmake -S /tmp/librealsense -B /tmp/librealsense/build \
-        -DCMAKE_INSTALL_PREFIX="${prefix}" \
-        -DCMAKE_BUILD_TYPE=Release \
-        -DFORCE_RSUSB_BACKEND=true \
-        -DBUILD_WITH_DDS=OFF \
-        -DCHECK_FOR_UPDATES=OFF \
-        -DBUILD_PYTHON_BINDINGS=false \
-        -DBUILD_WITH_CUDA=false \
-        -DBUILD_EXAMPLES=true \
-        -DBUILD_GRAPHICAL_EXAMPLES=true && \
-    cmake --build /tmp/librealsense/build -j"$(nproc)" && \
-    cmake --install /tmp/librealsense/build && \
-    DESTDIR="${stage}" cmake --install /tmp/librealsense/build && \
+    ldconfig && \
     mkdir -p /tmp/rs_ws/src && \
     git clone --depth 1 --branch "${REALSENSE_ROS_VERSION}" \
         https://github.com/IntelRealSense/realsense-ros.git /tmp/rs_ws/src/realsense-ros && \
@@ -264,7 +293,7 @@ RUN prefix="/opt/ros/${ROS_DISTRO}" && \
         DESTDIR="${stage}" cmake --install "${b}" --prefix "${prefix}"; \
     done && \
     cp -r /tmp/rs_ws/src /opt/rs-stage-src && \
-    rm -rf /tmp/librealsense /tmp/rs_ws /var/lib/apt/lists/*
+    rm -rf /tmp/rs_ws /var/lib/apt/lists/*
 
 COPY --chmod=0755 "./${ENTRYPOINT_FILE}" "/entrypoint.sh"
 COPY --chown="${USER}":"${GROUP}" --chmod=0755 .base/config "${CONFIG_DIR}"

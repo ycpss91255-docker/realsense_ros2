@@ -80,11 +80,12 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      # Publish gate: build (and thus RUN) the SDK `test` stage before pushing.
-      # A tree that fails the asserts aborts here so a broken SDK image never
-      # reaches GHCR. Same cache scope as the push below, so the librealsense
-      # compile is shared -- this step warms the cache and the push reuses it.
-      - name: Build and test SDK (publish gate)
+      # Publish GATE: build the SDK Dockerfile's `test` stage (RUN-asserts the
+      # /rs-full + /rs-stage trees are correct) WITHOUT pushing. A broken SDK
+      # tree fails here, so the push step below never runs -- no bad image
+      # reaches GHCR. Warms the shared `build` layer into the cache scope that
+      # the push step then reuses.
+      - name: Test SDK (publish gate, no push)
         uses: docker/build-push-action@v7
         with:
           context: docker/librealsense
@@ -98,8 +99,10 @@ jobs:
           cache-from: type=gha,scope=librealsense-${{ matrix.distro }}-${{ matrix.arch }}
           cache-to: type=gha,scope=librealsense-${{ matrix.distro }}-${{ matrix.arch }},mode=max
 
-      # Push the `export` (scratch) target: the published image is just the two
-      # librealsense DESTDIR trees the consumer COPYs, not the fat build image.
+      # Push the `export` (scratch) target: the published image is literally
+      # just the two librealsense trees (/rs-full + /rs-stage), no ROS base or
+      # build-deps -- the consumer only COPYs those trees. Reuses the cache the
+      # gate step warmed, so the `build` stage is not recompiled here.
       - name: Build and push by digest
         id: build
         uses: docker/build-push-action@v7
@@ -112,7 +115,6 @@ jobs:
             ROS_DISTRO=${{ matrix.distro }}
             LIBREALSENSE_VERSION=${{ env.LIBREALSENSE_VERSION }}
           cache-from: type=gha,scope=librealsense-${{ matrix.distro }}-${{ matrix.arch }}
-          cache-to: type=gha,scope=librealsense-${{ matrix.distro }}-${{ matrix.arch }},mode=max
           outputs: type=image,name=${{ env.IMAGE }},push-by-digest=true,name-canonical=true,push=true
 
       - name: Export digest
