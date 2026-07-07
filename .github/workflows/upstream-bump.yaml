@@ -1,0 +1,82 @@
+name: Upstream RealSense bump
+
+# dependabot's docker ecosystem cannot see the librealsense / realsense-ros
+# tags embedded in the Dockerfile ARGs, so this bespoke scheduled workflow
+# checks upstream releases and opens a bump PR when a newer tag appears. A
+# second job flags drift of the vendored udev rules against the pinned SDK tag.
+
+on:
+  schedule:
+    - cron: '0 6 * * 1'
+  workflow_dispatch:
+
+jobs:
+
+  bump-versions:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check for newer upstream releases
+        id: bump
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set +e
+          out="$(script/bump_realsense_versions.sh)"
+          code=$?
+          set -e
+          echo "${out}"
+          if [ "${code}" -eq 0 ]; then
+            {
+              echo "changed=true"
+              echo "summary<<EOF"
+              echo "${out}"
+              echo "EOF"
+            } >> "${GITHUB_OUTPUT}"
+          elif [ "${code}" -eq 10 ]; then
+            echo "changed=false" >> "${GITHUB_OUTPUT}"
+          else
+            exit "${code}"
+          fi
+
+      - name: Open bump PR
+        if: steps.bump.outputs.changed == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SUMMARY: ${{ steps.bump.outputs.summary }}
+        run: |
+          branch="bump/realsense-$(date +%Y%m%d)"
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git checkout -b "${branch}"
+          git add Dockerfile
+          git commit -m "chore(deps): bump pinned RealSense source versions"
+          git push -u origin "${branch}"
+          gh pr create \
+            --title "chore(deps): bump pinned RealSense source versions" \
+            --body "Automated bump of the pinned RealSense source tags (#97).
+
+          ${SUMMARY}
+
+          The SDK SONAME is librealsense2.so.2.58, so a same-minor bump is a
+          drop-in. Merge gate: CI green on the full matrix
+          (humble+jazzy x amd64+arm64) AND a manual D455-on-Pi5 aligned-depth
+          run, per issue #97. If the udev-rules sync check reports drift,
+          re-vendor config/realsense/99-realsense-libusb.rules before merge."
+
+  check-udev-rules:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Flag vendored udev-rules drift
+        run: |
+          if ! script/check_udev_rules_sync.sh; then
+            echo "::warning file=config/realsense/99-realsense-libusb.rules::Vendored RealSense udev rules have drifted from the pinned SDK tag; re-vendor from upstream."
+          fi
