@@ -1,0 +1,52 @@
+name: GHCR librealsense cleanup
+
+# Deletes untagged ORPHAN digests from the `librealsense` GHCR package, which
+# realsense_ros2's build-librealsense.yaml publishes (v2.58.2-jammy / -noble)
+# push-by-digest -- that pattern accumulates untagged versions over time.
+#
+# NOTE: the librealsense package is OWNED by realsense_ros1, which runs the same
+# cleanup (realsense_ros1 #103). This per-repo copy exists per the maintainer's
+# "each ros1/ros2 publisher carries its own workflow" policy; it is functionally
+# redundant with ros1's (same shared package) but harmless -- the action is
+# idempotent, and the schedule is offset (Monday vs ros1's Sunday) so the two
+# never run at the same minute. If you prefer a single owner-only cleanup, drop
+# this file and keep realsense_ros1's.
+#
+# dataaxiom/ghcr-cleanup-action is MULTI-ARCH AWARE: the amd64/arm64 child
+# manifests referenced by a live tagged index (v2.55.1-focal / v2.58.2-jammy /
+# v2.58.2-noble) are preserved -- only truly-orphaned untagged digests older
+# than the window are removed, so live tags never 404. (This is why we do NOT
+# use actions/delete-package-versions --delete-only-untagged, which deletes
+# tag-referenced children.)
+#
+# Recommended first step: run once via workflow_dispatch with dry-run=true and
+# review the "would delete" list before the schedule starts deleting for real.
+
+on:
+  schedule:
+    - cron: "0 3 * * 1" # weekly, Monday 03:00 UTC (offset from ros1's Sunday)
+  workflow_dispatch:
+    inputs:
+      dry-run:
+        description: "Log what would be deleted without deleting"
+        type: boolean
+        default: true
+
+permissions:
+  packages: write
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    steps:
+      # Scheduled runs delete for real; manual (workflow_dispatch) runs default
+      # to dry-run so you can review the keep/delete set safely first.
+      - name: Clean up untagged librealsense orphans
+        uses: dataaxiom/ghcr-cleanup-action@v1
+        with:
+          owner: ycpss91255-docker
+          package: librealsense
+          delete-untagged: true
+          older-than: 7 days
+          dry-run: ${{ github.event_name == 'workflow_dispatch' && inputs.dry-run || false }}
+          token: ${{ secrets.GITHUB_TOKEN }}
