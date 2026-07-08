@@ -99,7 +99,11 @@ versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   the realsense-ros wrapper still lands in `/opt/ros/<distro>`), and its image
   tag is `v2.58.2-jammy` / `v2.58.2-noble` rather than `<distro>-v2.58.2`, since
   librealsense2 is a pure C++ library whose `.so` is ABI-bound to the Ubuntu
-  release's glibc/libstdc++, not to ROS.
+  release's glibc/libstdc++, not to ROS. The leaner `ubuntu` base also needs two
+  things `ros-base` provided for free: `ca-certificates` (installed explicitly,
+  for the https SDK clone) and `DEBIAN_FRONTEND=noninteractive` on the apt
+  install (the GTK/GL deps pull in `tzdata`, which would otherwise prompt
+  interactively and hang the TTY-less build).
 - The published `librealsense` SDK image is now the slim `scratch`-based
   `export` target -- literally just the `/rs-full` + `/rs-stage` trees, with the
   Ubuntu base + build-deps dropped (the consumer only COPYs those trees).
