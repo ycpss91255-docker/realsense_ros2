@@ -23,7 +23,7 @@ ARG TEST_TOOLS_IMAGE="test-tools:local"
 # `just build` / `./build.sh` flow (the pre-build hook
 # script/hooks/pre/build.sh auto-builds it from docker/librealsense/Dockerfile
 # when LIBREALSENSE_IMAGE is unset -> self-contained, no GHCR needed), or to
-# the multi-arch ghcr.io/ycpss91255-docker/librealsense:${ROS_DISTRO}-${LIBREALSENSE_VERSION}
+# the multi-arch ghcr.io/ycpss91255-docker/librealsense:${LIBREALSENSE_VERSION}-${UBUNTU_CODENAME}
 # in CI (main.yaml passes it as a build-arg so buildx PULLS the prebuilt SDK
 # instead of recompiling librealsense ~15-25 min per run). Both the GHCR export
 # image and the local image expose the two trees at /rs-full and /rs-stage.
@@ -246,14 +246,15 @@ ARG REALSENSE_ROS_VERSION="4.58.2"
 # COPY the prebuilt SDK trees in BEFORE the wrapper build (issue #97).
 # librealsense is now consumed as a PREBUILT GHCR image (the `rs_sdk` stage at
 # the top), not compiled here -- CI no longer pays the ~15-25 min librealsense
-# compile per run, only the colcon wrapper build. The full SDK (viewer + rs-* +
-# gl) overlays the devel ROS prefix (mirrors the apt layout: entrypoint/paths
-# unchanged, find_package(realsense2) resolves it); the tools-pruned copy stages
-# at /opt/rs-stage for the runtime overlay. The SDK was built with
+# compile per run, only the colcon wrapper build. librealsense is ROS-agnostic,
+# so the full SDK (viewer + rs-* + gl) installs into /usr/local (ldconfig below
+# + find_package(realsense2) resolve it from there); the tools-pruned copy
+# stages at /opt/rs-stage/usr/local for the runtime overlay. The wrapper itself
+# still builds into /opt/ros/${ROS_DISTRO} further down. The SDK was built with
 # FORCE_RSUSB_BACKEND=true (userspace, no kernel module -- the whole point for
 # the Pi) and no Python bindings (see docker/librealsense/Dockerfile).
-COPY --from=rs_sdk /rs-full/opt/ros/${ROS_DISTRO} /opt/ros/${ROS_DISTRO}
-COPY --from=rs_sdk /rs-stage/opt/ros/${ROS_DISTRO} /opt/rs-stage/opt/ros/${ROS_DISTRO}
+COPY --from=rs_sdk /rs-full/usr/local /usr/local
+COPY --from=rs_sdk /rs-stage/usr/local /opt/rs-stage/usr/local
 
 # ldconfig registers the copied librealsense .so, then realsense-ros (wrapper)
 # is built with colcon against the prebuilt SDK and installed into
@@ -393,15 +394,18 @@ ARG ROS_DISTRO
 ARG USER_NAME="user"
 ARG USER="${USER_NAME}"
 
-# RealSense libs + wrapper, staged from the devel source build (#97). Copy only
-# the SDK/wrapper libs (lib/) and the ament-indexed resources (share/); the
-# bin/ SDK tools (realsense-viewer, rs-*) are deliberately omitted from runtime.
-# Install into /opt/ros/${ROS_DISTRO} exactly where apt put them, so the base
-# setup.bash discovers the packages via the ament index -- entrypoint/bashrc/
-# smoke paths unchanged. /tmp/rs-src holds ONLY the wrapper package.xml (not the
-# whole ros share tree) so runtime's rosdep scans just those manifests.
+# RealSense libs + wrapper, staged from the devel source build (#97). The
+# wrapper libs (lib/) + ament resources (share/) install into
+# /opt/ros/${ROS_DISTRO} where the base setup.bash discovers them via the ament
+# index -- entrypoint/bashrc/smoke paths unchanged. The librealsense SDK runtime
+# libs come from the pruned /usr/local tree (ldconfig registers /usr/local/lib
+# below). The bin/ SDK tools (realsense-viewer, rs-*) and librealsense2-gl were
+# already pruned from the staged trees, so runtime never carries them.
+# /tmp/rs-src holds ONLY the wrapper package.xml (not the whole ros share tree)
+# so runtime's rosdep scans just those manifests.
 COPY --from=devel /opt/rs-stage/opt/ros/${ROS_DISTRO}/lib/   /opt/ros/${ROS_DISTRO}/lib/
 COPY --from=devel /opt/rs-stage/opt/ros/${ROS_DISTRO}/share/ /opt/ros/${ROS_DISTRO}/share/
+COPY --from=devel /opt/rs-stage/usr/local/lib/               /usr/local/lib/
 COPY --from=devel /opt/rs-stage-src                          /tmp/rs-src
 
 # Resolve the wrapper's exec ROS deps online (image_transport,
@@ -415,8 +419,7 @@ COPY --from=devel /opt/rs-stage-src                          /tmp/rs-src
 # non-interactive guard short-circuits otherwise), so non-interactive
 # correctness is untouched. devel already does this via its bashrc.d drop-in
 # (base#657, #87). Folded into one RUN to avoid a consecutive-RUN lint (DL3059).
-RUN rm -f /opt/ros/"${ROS_DISTRO}"/lib/librealsense2-gl* && \
-    apt-get update && \
+RUN apt-get update && \
     (rosdep init 2>/dev/null || true) && \
     rosdep update && \
     rosdep install -i --from-path /tmp/rs-src --rosdistro "${ROS_DISTRO}" \

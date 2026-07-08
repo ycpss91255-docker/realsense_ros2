@@ -19,7 +19,7 @@
 |------|-------------|
 | `realsense2_camera is discoverable via ament index (source build)` | `realsense2_camera` ament marker present under `/opt/ros/${ROS_DISTRO}` (built from pinned source, #97) |
 | `realsense2_description is discoverable via ament index (source build)` | `realsense2_description` ament marker present under `/opt/ros/${ROS_DISTRO}` (bundled in realsense-ros source, #97) |
-| `RealSense SDK tool libraries resolve (rs-enumerate-devices)` | SDK CLI tool's shared libraries (librealsense2.so) all resolve via ldd with ROS sourced |
+| `RealSense SDK tool libraries resolve (rs-enumerate-devices)` | `/usr/local/bin` SDK CLI tool's shared libraries (librealsense2.so) all resolve via ldd (ldconfig registers /usr/local/lib) |
 
 ### Desktop GUI (devel) (2)
 

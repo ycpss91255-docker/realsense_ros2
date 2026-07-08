@@ -90,12 +90,19 @@ versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   librealsense compile from every build. This mirrors base's `TEST_TOOLS_IMAGE`
   dual-source pattern: local builds FROM `librealsense:local` (built by the
   pre-build hook, no GHCR), CI passes
-  `LIBREALSENSE_IMAGE=ghcr.io/ycpss91255-docker/librealsense:<distro>-v2.58.2`
-  per matrix distro so buildx PULLS the prebuilt SDK. `main.yaml` wires the
-  per-distro tag through `build_args`.
+  `LIBREALSENSE_IMAGE=ghcr.io/ycpss91255-docker/librealsense:v2.58.2-<codename>`
+  per matrix Ubuntu codename so buildx PULLS the prebuilt SDK. `main.yaml` wires
+  the per-codename tag through `build_args`.
+- The prebuilt `librealsense` SDK image is ROS-agnostic and keyed on the Ubuntu
+  platform, not the ROS distro. It builds on `ubuntu:<codename>` and installs
+  into the `/usr/local` prefix (the consumer COPYs it there and runs `ldconfig`;
+  the realsense-ros wrapper still lands in `/opt/ros/<distro>`), and its image
+  tag is `v2.58.2-jammy` / `v2.58.2-noble` rather than `<distro>-v2.58.2`, since
+  librealsense2 is a pure C++ library whose `.so` is ABI-bound to the Ubuntu
+  release's glibc/libstdc++, not to ROS.
 - The published `librealsense` SDK image is now the slim `scratch`-based
   `export` target -- literally just the `/rs-full` + `/rs-stage` trees, with the
-  ROS base + build-deps dropped (the consumer only COPYs those trees).
+  Ubuntu base + build-deps dropped (the consumer only COPYs those trees).
 - The `runtime` image now launches with `initial_reset:=true` by default: on the
   RSUSB userspace backend, a D455 cold-start on arm64 could wedge the first
   stream-open (`RS2_USB_STATUS_IO`, topics stuck at 0 Hz); resetting the device

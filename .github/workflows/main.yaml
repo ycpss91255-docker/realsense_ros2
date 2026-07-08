@@ -33,21 +33,23 @@ jobs:
       cache_variant: ${{ matrix.target.name }}
       platforms: linux/amd64,linux/arm64
       test_tools_version: v0.41.0
-      # LIBREALSENSE_IMAGE resolves PER-DISTRO from the matrix cell's ros_distro
-      # (humble -> :humble-v2.58.2, jazzy -> :jazzy-v2.58.2), so CI PULLS the
-      # matching prebuilt SDK published by build-librealsense.yaml instead of
-      # rebuilding librealsense. The version literal is pinned inline here: the
-      # `env` context is NOT available in a reusable-workflow call's `with:`
-      # (only matrix/github/needs/inputs/vars are), so it cannot be factored
-      # into a workflow-level env var -- keep it in sync with the
-      # LIBREALSENSE_VERSION ARG in the main Dockerfile and build-librealsense.yaml.
-      # Local builds omit this arg -> the Dockerfile default `librealsense:local`
-      # (built by script/hooks/pre/build.sh).
+      # LIBREALSENSE_IMAGE resolves PER-PLATFORM from the matrix cell's
+      # ubuntu_codename (jammy -> :v2.58.2-jammy, noble -> :v2.58.2-noble): the
+      # SDK is a pure C++ library whose .so is ABI-bound to the Ubuntu release,
+      # not the ROS distro, so it is keyed on the codename. CI PULLS the matching
+      # prebuilt SDK published by build-librealsense.yaml instead of rebuilding
+      # librealsense. The version literal is pinned inline here: the `env`
+      # context is NOT available in a reusable-workflow call's `with:` (only
+      # matrix/github/needs/inputs/vars are), so it cannot be factored into a
+      # workflow-level env var -- keep it in sync with the LIBREALSENSE_VERSION
+      # ARG in the main Dockerfile and build-librealsense.yaml. Local builds omit
+      # this arg -> the Dockerfile default `librealsense:local` (built by
+      # script/hooks/pre/build.sh).
       build_args: |
         ROS_DISTRO=${{ matrix.target.ros_distro }}
         ROS_TAG=${{ matrix.target.ros_tag }}
         UBUNTU_CODENAME=${{ matrix.target.ubuntu_codename }}
-        LIBREALSENSE_IMAGE=ghcr.io/ycpss91255-docker/librealsense:${{ matrix.target.ros_distro }}-v2.58.2
+        LIBREALSENSE_IMAGE=ghcr.io/ycpss91255-docker/librealsense:v2.58.2-${{ matrix.target.ubuntu_codename }}
 
   # Stable-named aggregator so branch protection's required status check does
   # not have to enumerate every matrix entry. Branch protection references

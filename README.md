@@ -384,7 +384,7 @@ realsense_ros2/
 │       └── TEST.md             # automatic build-time smoke tests
 ├── .github/workflows/
 │   ├── main.yaml                # CI (calls base reusable build/release workers)
-│   ├── build-librealsense.yaml  # Publish the prebuilt librealsense SDK image (humble/jazzy) to GHCR
+│   ├── build-librealsense.yaml  # Publish the prebuilt librealsense SDK image (per Ubuntu platform: jammy/noble) to GHCR
 │   └── upstream-bump.yaml       # Scheduled: open a bump PR on a new upstream release
 └── test/
     └── smoke/                   # repo-owned bats tests

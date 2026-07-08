@@ -1,20 +1,23 @@
 name: Build librealsense SDK image
 
-# Pre-builds the librealsense SDK ONCE per ROS 2 distro and publishes each to
+# Pre-builds the librealsense SDK ONCE per Ubuntu platform and publishes each to
 # GHCR so the main repo build (and CI) consumes it as a prebuilt image instead
-# of recompiling librealsense (~15-25 min) on every run. Two distros are
-# published from the same SDK Dockerfile (parameterized by ROS_DISTRO):
-#   humble (Ubuntu 22.04 jammy) -> librealsense:humble-${LIBREALSENSE_VERSION}
-#   jazzy  (Ubuntu 24.04 noble) -> librealsense:jazzy-${LIBREALSENSE_VERSION}
+# of recompiling librealsense (~15-25 min) on every run. librealsense2 is a pure
+# C++ SDK -- it does NOT depend on ROS; its .so is ABI-bound to the Ubuntu
+# release's glibc/libstdc++, so the image is keyed on the Ubuntu codename (NOT
+# the ROS distro) and installs into /usr/local. Two platforms are published from
+# the same SDK Dockerfile (parameterized by UBUNTU_CODENAME):
+#   jammy (Ubuntu 22.04, for ROS 2 humble) -> librealsense:${LIBREALSENSE_VERSION}-jammy
+#   noble (Ubuntu 24.04, for ROS 2 jazzy)  -> librealsense:${LIBREALSENSE_VERSION}-noble
 #
 # Per-arch NATIVE builds (linux/amd64 -> ubuntu-latest, linux/arm64 ->
 # ubuntu-24.04-arm) mirror base's build-worker: no QEMU emulation. Each shard
-# pushes an image by DIGEST, then a per-distro merge job assembles the
-# multi-arch manifest under the tag ${distro}-${LIBREALSENSE_VERSION}.
+# pushes an image by DIGEST, then a per-codename merge job assembles the
+# multi-arch manifest under the tag ${LIBREALSENSE_VERSION}-${codename}.
 #
 # ONE-TIME OPERATIONAL PREREQUISITE (blocks the main CI build otherwise):
 # GHCR packages first published via GITHUB_TOKEN are PRIVATE by default, and
-# the main Dockerfile's `FROM ghcr.io/.../librealsense:${DISTRO}-v2.58.2` is
+# the main Dockerfile's `FROM ghcr.io/.../librealsense:v2.58.2-${CODENAME}` is
 # pulled ANONYMOUSLY in CI (same as the base test-tools image). So the FIRST run
 # of this workflow must complete AND the librealsense package must be flipped to
 # PUBLIC (repo/org Packages -> librealsense -> Package settings -> Change
@@ -44,19 +47,19 @@ env:
 
 jobs:
   # ────────────────────────────────────────────────────────────────
-  # Per-distro, per-platform native build. Each shard pushes an untagged
+  # Per-codename, per-platform native build. Each shard pushes an untagged
   # image by digest; the merge job below stitches the digests belonging to
-  # the same distro into one manifest.
+  # the same codename into one manifest.
   # ────────────────────────────────────────────────────────────────
   build:
     strategy:
       fail-fast: false
-      # Two real axes (distro x arch) give the full 2x2 = 4-job product; the
+      # Two real axes (codename x arch) give the full 2x2 = 4-job product; the
       # `include` entries only map each arch to its native platform + runner
       # (they match on the existing `arch` value, so they EXTEND the matching
       # combinations rather than adding new standalone jobs).
       matrix:
-        distro: [humble, jazzy]
+        codename: [jammy, noble]
         arch: [amd64, arm64]
         include:
           - arch: amd64
@@ -94,13 +97,13 @@ jobs:
           target: test
           push: false
           build-args: |
-            ROS_DISTRO=${{ matrix.distro }}
+            UBUNTU_CODENAME=${{ matrix.codename }}
             LIBREALSENSE_VERSION=${{ env.LIBREALSENSE_VERSION }}
-          cache-from: type=gha,scope=librealsense-${{ matrix.distro }}-${{ matrix.arch }}
-          cache-to: type=gha,scope=librealsense-${{ matrix.distro }}-${{ matrix.arch }},mode=max
+          cache-from: type=gha,scope=librealsense-${{ matrix.codename }}-${{ matrix.arch }}
+          cache-to: type=gha,scope=librealsense-${{ matrix.codename }}-${{ matrix.arch }},mode=max
 
       # Push the `export` (scratch) target: the published image is literally
-      # just the two librealsense trees (/rs-full + /rs-stage), no ROS base or
+      # just the two librealsense trees (/rs-full + /rs-stage), no Ubuntu base or
       # build-deps -- the consumer only COPYs those trees. Reuses the cache the
       # gate step warmed, so the `build` stage is not recompiled here.
       - name: Build and push by digest
@@ -112,9 +115,9 @@ jobs:
           platforms: ${{ matrix.platform }}
           target: export
           build-args: |
-            ROS_DISTRO=${{ matrix.distro }}
+            UBUNTU_CODENAME=${{ matrix.codename }}
             LIBREALSENSE_VERSION=${{ env.LIBREALSENSE_VERSION }}
-          cache-from: type=gha,scope=librealsense-${{ matrix.distro }}-${{ matrix.arch }}
+          cache-from: type=gha,scope=librealsense-${{ matrix.codename }}-${{ matrix.arch }}
           outputs: type=image,name=${{ env.IMAGE }},push-by-digest=true,name-canonical=true,push=true
 
       - name: Export digest
@@ -127,15 +130,15 @@ jobs:
       - name: Upload digest
         uses: actions/upload-artifact@v4
         with:
-          name: digest-${{ matrix.distro }}-${{ matrix.arch }}
+          name: digest-${{ matrix.codename }}-${{ matrix.arch }}
           path: /tmp/digests/*
           if-no-files-found: error
           retention-days: 1
 
   # ────────────────────────────────────────────────────────────────
-  # Merge the per-arch digests of each distro into a single multi-arch
-  # manifest tagged ${distro}-${LIBREALSENSE_VERSION} (e.g. humble-v2.58.2,
-  # jazzy-v2.58.2). One merge job per distro via the matrix.
+  # Merge the per-arch digests of each codename into a single multi-arch
+  # manifest tagged ${LIBREALSENSE_VERSION}-${codename} (e.g. v2.58.2-jammy,
+  # v2.58.2-noble). One merge job per codename via the matrix.
   # ────────────────────────────────────────────────────────────────
   merge:
     needs: build
@@ -143,13 +146,13 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        distro: [humble, jazzy]
+        codename: [jammy, noble]
     steps:
       - name: Download digests
         uses: actions/download-artifact@v4
         with:
           path: /tmp/digests
-          pattern: digest-${{ matrix.distro }}-*
+          pattern: digest-${{ matrix.codename }}-*
           merge-multiple: true
 
       - name: Set up Docker Buildx
@@ -166,7 +169,7 @@ jobs:
         working-directory: /tmp/digests
         run: |
           set -euo pipefail
-          tag="${IMAGE}:${{ matrix.distro }}-${LIBREALSENSE_VERSION}"
+          tag="${IMAGE}:${LIBREALSENSE_VERSION}-${{ matrix.codename }}"
           # shellcheck disable=SC2046
           docker buildx imagetools create -t "${tag}" \
             $(printf "${IMAGE}@sha256:%s " *)
@@ -174,4 +177,4 @@ jobs:
       - name: Inspect manifest
         run: |
           set -euo pipefail
-          docker buildx imagetools inspect "${IMAGE}:${{ matrix.distro }}-${LIBREALSENSE_VERSION}"
+          docker buildx imagetools inspect "${IMAGE}:${LIBREALSENSE_VERSION}-${{ matrix.codename }}"

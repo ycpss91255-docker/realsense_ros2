@@ -371,7 +371,7 @@ realsense_ros2/
 │       └── TEST.md             # 建置期自動 smoke 測試
 ├── .github/workflows/
 │   ├── main.yaml                # CI（呼叫 base 的 reusable build/release worker）
-│   ├── build-librealsense.yaml  # 發布預建 librealsense SDK image（humble/jazzy）至 GHCR
+│   ├── build-librealsense.yaml  # 發布預建 librealsense SDK image（依 Ubuntu 平台：jammy/noble）至 GHCR
 │   └── upstream-bump.yaml       # 排程：有新上游 release 時開啟 bump PR
 └── test/
     └── smoke/                   # repo 自有的 bats 測試
