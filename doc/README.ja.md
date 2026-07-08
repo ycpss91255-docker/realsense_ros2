@@ -300,6 +300,37 @@ udev ルールはコンテナ内だけでなく **ホスト** にインストー
 にコピーして udev をリロードします。その後カメラを再接続してください。コンテナ自体は
 `privileged` モードで実行され、`/dev` がマウントされます。
 
+### カメラ設定（Camera Config）
+
+有効なカメラ profile はルートの `camera.yaml` **シンボリックリンク** で選択します
+（`app/ros1_bridge` の `bridge.yaml` に倣っています）。デフォルトの対象は
+`config/realsense/custom/none.yaml` という**空ファイル**で、runtime image は標準の
+アップストリームデフォルト（640x480x30、深度整列）を従来どおり起動します。
+Dockerfile はリンク対象を `/camera_config.yaml` に COPY し、そのファイルが空でない
+場合、entrypoint は
+`ros2 launch realsense2_camera rs_launch.py config_file:=/camera_config.yaml
+initial_reset:=true` を起動し、空なら既定の `CMD` を実行します。
+
+profile を有効化するにはシンボリックリンクを張り替えるか:
+
+```bash
+ln -sf config/realsense/custom/usb2.yaml camera.yaml
+./script/build.sh
+```
+
+リンクを触らずビルドごとに build arg で指定します:
+
+```bash
+./script/build.sh --build-arg CAMERA_CONFIG=config/realsense/custom/usb2.yaml
+```
+
+`config/realsense/custom/usb2.yaml` は検証済みの USB2 profile です（color
+640x480@15 + depth 480x270@15、整列；infra/IMU オフ）。`config/realsense/`
+直下のファイルは realsense-ros から verbatim で vendored され、
+`check_configs_sync.sh` のドリフトチェックで監視されます。独自 profile は
+`config/realsense/custom/` に置いてください。詳細は
+[config/realsense/README.md](../config/realsense/README.md) を参照。
+
 ## アーキテクチャ
 
 ### Docker ビルドステージ図
@@ -348,6 +379,7 @@ realsense_ros2/
 ├── Dockerfile                   # マルチステージビルド
 ├── LICENSE
 ├── README.md
+├── camera.yaml -> config/realsense/custom/none.yaml # シンボリックリンク（有効なカメラ設定；デフォルト = 標準）
 ├── justfile -> .base/script/docker/justfile        # シンボリックリンク（ユーザーエントリポイント）
 ├── .hadolint.yaml -> .base/.hadolint.yaml          # シンボリックリンク
 ├── .base/                       # base サブツリー（読み取り専用；v0.41.0）
@@ -355,6 +387,7 @@ realsense_ros2/
 │   ├── entrypoint.sh            # コンテナエントリポイント（リポジトリ所有）
 │   ├── install_udev_rules.sh    # ホストに RealSense udev ルールをインストール（リポジトリ所有）
 │   ├── check_udev_rules_sync.sh # vendored udev ルールとピン留め SDK tag の同期を確認（リポジトリ所有）
+│   ├── check_configs_sync.sh    # vendored サンプル設定とピン留め realsense-ros tag の同期を確認（リポジトリ所有）
 │   ├── bump_realsense_versions.sh # ピン留め SDK/wrapper tag を更新（リポジトリ所有；upstream-bump を駆動）
 │   ├── build.sh -> ../.base/script/docker/wrapper/build.sh   # シンボリックリンク
 │   ├── run.sh   -> ../.base/script/docker/wrapper/run.sh     # シンボリックリンク
@@ -372,7 +405,14 @@ realsense_ros2/
 │   ├── docker/
 │   │   └── setup.conf           # 設定サーフェス（.env/compose.yaml はここから生成）
 │   └── realsense/
-│       └── 99-realsense-libusb.rules  # RealSense udev ルール
+│       ├── README.md                  # vendored-verbatim 設定の説明
+│       ├── 99-realsense-libusb.rules  # RealSense udev ルール（librealsense から vendored）
+│       ├── config.yaml                # vendored サンプル設定（realsense-ros）
+│       ├── global_settings.yaml       # vendored サンプル設定（realsense-ros）
+│       ├── d500_tables/               # vendored D500 サンプル JSON テーブル（realsense-ros）
+│       └── custom/                    # 独自の profile（vendored とは分離）
+│           ├── none.yaml              # 空ファイル = 標準/デフォルト（camera.yaml のデフォルト対象）
+│           └── usb2.yaml              # USB2 向け profile（640x480@15 + 480x270@15、整列）
 ├── doc/
 │   ├── README.zh-TW.md          # 繁体字中国語
 │   ├── README.zh-CN.md          # 簡体字中国語

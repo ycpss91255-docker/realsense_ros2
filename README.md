@@ -297,6 +297,37 @@ It copies `config/realsense/99-realsense-libusb.rules` to `/etc/udev/rules.d/`
 and reloads udev. Re-plug the camera afterwards. The container itself runs in
 `privileged` mode with `/dev` mounted.
 
+### Camera Config
+
+The active camera profile is selected by the root `camera.yaml` **symlink**
+(modeled on `app/ros1_bridge`'s `bridge.yaml`). Its default target is
+`config/realsense/custom/none.yaml`, an **empty** file, so the runtime image
+launches the stock upstream default (640x480x30, aligned depth) exactly as
+before. The Dockerfile COPYs the symlink target to `/camera_config.yaml`; when
+that file is non-empty the entrypoint launches
+`ros2 launch realsense2_camera rs_launch.py config_file:=/camera_config.yaml
+initial_reset:=true`, otherwise it runs the default `CMD`.
+
+Activate a profile either by repointing the symlink:
+
+```bash
+ln -sf config/realsense/custom/usb2.yaml camera.yaml
+./script/build.sh
+```
+
+or per build without touching the symlink:
+
+```bash
+./script/build.sh --build-arg CAMERA_CONFIG=config/realsense/custom/usb2.yaml
+```
+
+`config/realsense/custom/usb2.yaml` is our validated USB2 profile (color
+640x480@15 + depth 480x270@15, aligned; infra/IMU off). Files directly under
+`config/realsense/` are vendored verbatim from realsense-ros and watched by the
+`check_configs_sync.sh` drift check; keep your own profiles in
+`config/realsense/custom/`. See
+[config/realsense/README.md](config/realsense/README.md).
+
 ## Architecture
 
 ### Docker Build Stage Diagram
@@ -347,6 +378,7 @@ realsense_ros2/
 ├── Dockerfile                   # Multi-stage build
 ├── LICENSE
 ├── README.md
+├── camera.yaml -> config/realsense/custom/none.yaml # symlink (active camera config; default = stock)
 ├── justfile -> .base/script/docker/justfile        # symlink (user entry point)
 ├── .hadolint.yaml -> .base/.hadolint.yaml          # symlink
 ├── .base/                       # base subtree (read-only; v0.41.0)
@@ -354,6 +386,7 @@ realsense_ros2/
 │   ├── entrypoint.sh            # Container entrypoint (repo-owned)
 │   ├── install_udev_rules.sh    # Install RealSense udev rules on the host (repo-owned)
 │   ├── check_udev_rules_sync.sh # Check vendored udev rules vs pinned SDK tag (repo-owned)
+│   ├── check_configs_sync.sh    # Check vendored example configs vs pinned realsense-ros tag (repo-owned)
 │   ├── bump_realsense_versions.sh # Bump pinned SDK/wrapper tags (repo-owned; drives upstream-bump)
 │   ├── build.sh -> ../.base/script/docker/wrapper/build.sh   # symlink
 │   ├── run.sh   -> ../.base/script/docker/wrapper/run.sh     # symlink
@@ -371,7 +404,14 @@ realsense_ros2/
 │   ├── docker/
 │   │   └── setup.conf           # configuration surface (.env/compose.yaml generated from this)
 │   └── realsense/
-│       └── 99-realsense-libusb.rules  # RealSense udev rules
+│       ├── README.md                  # notes on the vendored-verbatim configs
+│       ├── 99-realsense-libusb.rules  # RealSense udev rules (vendored from librealsense)
+│       ├── config.yaml                # vendored example config (realsense-ros)
+│       ├── global_settings.yaml       # vendored example config (realsense-ros)
+│       ├── d500_tables/               # vendored D500 example JSON tables (realsense-ros)
+│       └── custom/                    # OUR profiles (kept separate from vendored)
+│           ├── none.yaml              # empty = stock/default (camera.yaml default target)
+│           └── usb2.yaml              # USB2-friendly profile (640x480@15 + 480x270@15, aligned)
 ├── doc/
 │   ├── README.zh-TW.md          # Traditional Chinese
 │   ├── README.zh-CN.md          # Simplified Chinese
