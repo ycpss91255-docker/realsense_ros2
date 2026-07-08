@@ -350,6 +350,10 @@ realsense_ros2/
 │   ├── setup.sh -> ../.base/script/docker/wrapper/setup.sh   # symlink
 │   ├── setup_tui.sh -> ../.base/script/docker/wrapper/setup_tui.sh  # symlink
 │   └── hooks/                   # pre/ + post/ wrapper hooks
+│       └── pre/build.sh         # 自動建置 librealsense:local，讓本地建置自給自足（repo 擁有）
+├── docker/
+│   └── librealsense/
+│       └── Dockerfile           # 預建 librealsense SDK 來源 image（本地：pre-build hook；CI：發布至 GHCR）
 ├── config/
 │   ├── docker/
 │   │   └── setup.conf           # 設定介面（.env/compose.yaml 由此產生）
@@ -367,6 +371,7 @@ realsense_ros2/
 │       └── TEST.md             # 建置期自動 smoke 測試
 ├── .github/workflows/
 │   ├── main.yaml                # CI（呼叫 base 的 reusable build/release worker）
+│   ├── build-librealsense.yaml  # 發布預建 librealsense SDK image（依 Ubuntu 平台：jammy/noble）至 GHCR
 │   └── upstream-bump.yaml       # 排程：有新上游 release 時開啟 bump PR
 └── test/
     └── smoke/                   # repo 自有的 bats 測試

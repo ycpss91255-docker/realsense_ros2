@@ -363,6 +363,10 @@ realsense_ros2/
 │   ├── setup.sh -> ../.base/script/docker/wrapper/setup.sh   # symlink
 │   ├── setup_tui.sh -> ../.base/script/docker/wrapper/setup_tui.sh  # symlink
 │   └── hooks/                   # pre/ + post/ wrapper hooks
+│       └── pre/build.sh         # Auto-builds librealsense:local for a self-contained local build (repo-owned)
+├── docker/
+│   └── librealsense/
+│       └── Dockerfile           # Prebuilt librealsense SDK source image (local: pre-build hook; CI: published to GHCR)
 ├── config/
 │   ├── docker/
 │   │   └── setup.conf           # configuration surface (.env/compose.yaml generated from this)
@@ -380,6 +384,7 @@ realsense_ros2/
 │       └── TEST.md             # automatic build-time smoke tests
 ├── .github/workflows/
 │   ├── main.yaml                # CI (calls base reusable build/release workers)
+│   ├── build-librealsense.yaml  # Publish the prebuilt librealsense SDK image (per Ubuntu platform: jammy/noble) to GHCR
 │   └── upstream-bump.yaml       # Scheduled: open a bump PR on a new upstream release
 └── test/
     └── smoke/                   # repo-owned bats tests
