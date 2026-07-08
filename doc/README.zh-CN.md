@@ -283,6 +283,35 @@ udev 规则必须装在 **host**，而不仅仅是容器内。容器没有 `udev
 脚本会把 `config/realsense/99-realsense-libusb.rules` 复制到 `/etc/udev/rules.d/`
 并重新加载 udev，之后请重新插拔相机。容器本身以 `privileged` 模式运行并挂载 `/dev`。
 
+### 相机配置（Camera Config）
+
+启用中的相机 profile 由根目录的 `camera.yaml` **符号链接** 选定（比照
+`app/ros1_bridge` 的 `bridge.yaml`）。默认目标是
+`config/realsense/custom/none.yaml`，一个**空文件**，因此 runtime image 会启动
+原厂上游默认（640x480x30，对齐深度），行为与之前完全一致。Dockerfile 会把
+符号链接目标 COPY 成 `/camera_config.yaml`；当该文件非空时，entrypoint 会执行
+`ros2 launch realsense2_camera rs_launch.py config_file:=/camera_config.yaml
+initial_reset:=true`，否则执行默认 `CMD`。
+
+启用某个 profile 可以重指符号链接：
+
+```bash
+ln -sf config/realsense/custom/usb2.yaml camera.yaml
+./script/build.sh
+```
+
+或不动符号链接，单次以 build arg 指定：
+
+```bash
+./script/build.sh --build-arg CAMERA_CONFIG=config/realsense/custom/usb2.yaml
+```
+
+`config/realsense/custom/usb2.yaml` 是我们验证过的 USB2 profile（color
+640x480@15 + depth 480x270@15，对齐；infra/IMU 关闭）。`config/realsense/` 下
+直接的文件是自 realsense-ros verbatim vendored，并由 `check_configs_sync.sh`
+漂移检查监看；自己的 profile 请放 `config/realsense/custom/`。详见
+[config/realsense/README.md](../config/realsense/README.md)。
+
 ## 架构
 
 ### Docker 构建阶段图
@@ -331,6 +360,7 @@ realsense_ros2/
 ├── Dockerfile                   # 多阶段构建
 ├── LICENSE
 ├── README.md
+├── camera.yaml -> config/realsense/custom/none.yaml # 符号链接（启用中的相机配置；默认 = 原厂）
 ├── justfile -> .base/script/docker/justfile        # 符号链接（用户入口）
 ├── .hadolint.yaml -> .base/.hadolint.yaml          # 符号链接
 ├── .base/                       # base subtree（只读；v0.41.0）
@@ -338,6 +368,7 @@ realsense_ros2/
 │   ├── entrypoint.sh            # 容器入口点（仓库自有）
 │   ├── install_udev_rules.sh    # 在 host 安装 RealSense udev 规则（仓库自有）
 │   ├── check_udev_rules_sync.sh # 检查 vendored udev 规则与固定 SDK tag 是否同步（仓库自有）
+│   ├── check_configs_sync.sh    # 检查 vendored 示例配置与固定 realsense-ros tag 是否同步（仓库自有）
 │   ├── bump_realsense_versions.sh # 更新固定的 SDK/wrapper tag（仓库自有；驱动 upstream-bump）
 │   ├── build.sh -> ../.base/script/docker/wrapper/build.sh   # 符号链接
 │   ├── run.sh   -> ../.base/script/docker/wrapper/run.sh     # 符号链接
@@ -355,7 +386,14 @@ realsense_ros2/
 │   ├── docker/
 │   │   └── setup.conf           # 配置面（.env/compose.yaml 由此生成）
 │   └── realsense/
-│       └── 99-realsense-libusb.rules  # RealSense udev 规则
+│       ├── README.md                  # vendored-verbatim 配置说明
+│       ├── 99-realsense-libusb.rules  # RealSense udev 规则（vendored 自 librealsense）
+│       ├── config.yaml                # vendored 示例配置（realsense-ros）
+│       ├── global_settings.yaml       # vendored 示例配置（realsense-ros）
+│       ├── d500_tables/               # vendored D500 示例 JSON 表（realsense-ros）
+│       └── custom/                    # 我们自己的 profile（与 vendored 分开）
+│           ├── none.yaml              # 空文件 = 原厂/默认（camera.yaml 默认目标）
+│           └── usb2.yaml              # USB2 友好 profile（640x480@15 + 480x270@15，对齐）
 ├── doc/
 │   ├── README.zh-TW.md          # 繁体中文
 │   ├── README.zh-CN.md          # 简体中文

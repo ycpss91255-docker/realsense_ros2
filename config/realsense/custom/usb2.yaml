@@ -1,0 +1,19 @@
+# USB2-friendly RealSense profile (ROS 2 param format, for rs_launch.py
+# config_file:=). Activate with the root camera.yaml symlink or a build arg:
+#   ln -sf config/realsense/custom/usb2.yaml camera.yaml
+#   ./script/build.sh --build-arg CAMERA_CONFIG=config/realsense/custom/usb2.yaml
+#
+# Validated D435/D455-on-USB2 profile: color 640x480@15 + depth 480x270@15,
+# aligned. Infra and IMU streams are disabled to fit the reduced USB2
+# bandwidth (see the "D435 USB2 needs low profile" and "D455 align residual"
+# field notes). These are the params consumed by realsense2_camera; unset keys
+# fall back to the node defaults.
+enable_color: true
+rgb_camera.color_profile: 640x480x15
+enable_depth: true
+depth_module.depth_profile: 480x270x15
+align_depth.enable: true
+enable_infra1: false
+enable_infra2: false
+enable_gyro: false
+enable_accel: false

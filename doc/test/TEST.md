@@ -1,6 +1,6 @@
 # TEST.md
 
-**70 tests** total.
+**75 tests** total.
 
 ## test/smoke/ros_env.bats
 
@@ -79,6 +79,18 @@
 | `version ARGs are pinned, not floating (#97)` | `LIBREALSENSE_VERSION=v2.58.2` / `REALSENSE_ROS_VERSION=4.58.2` pinned, not `latest` |
 | `runtime-test smoke asserts the ament marker (#97)` | runtime smoke runs `ros2 pkg prefix realsense2_camera` to catch a missed marker |
 | `runtime rosdep skips the self-built SDK and resolves exec deps only (#97)` | runtime rosdep uses `--dependency-types=exec --skip-keys=librealsense2` |
+
+## test/smoke/camera_config.bats
+
+### Camera-config wiring (5)
+
+| Test | Description |
+|------|-------------|
+| `camera.yaml symlink resolved into the image (/camera_config.yaml exists)` | Docker COPY followed the root `camera.yaml` symlink; `/camera_config.yaml` is present |
+| `default camera config is empty (stock upstream default)` | Default target `config/realsense/custom/none.yaml` is 0 bytes so the `[ -s ]` guard is false |
+| `entrypoint gates the camera launch on a non-empty config ([ -s ])` | `/entrypoint.sh` carries the `[ -s "${_camera_config}" ]` conditional |
+| `entrypoint launches rs_launch.py with config_file when a config is active` | Entrypoint execs `config_file:=` + `initial_reset:=true` on an active config |
+| `Dockerfile declares CAMERA_CONFIG and COPYs it to /camera_config.yaml` | `ARG CAMERA_CONFIG="camera.yaml"` + the `COPY ... /camera_config.yaml` wiring is present |
 
 ## .base/test/smoke/script_help.bats
 

@@ -6,6 +6,31 @@ versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ## [Unreleased]
 
 ### Added
+- Optional **camera config** selected by the root `camera.yaml` symlink
+  (modeled on `app/ros1_bridge`'s `bridge.yaml`). The Dockerfile
+  (`ARG CAMERA_CONFIG="camera.yaml"` + `COPY --chmod=0644 "${CAMERA_CONFIG}"
+  /camera_config.yaml`, both the `devel` and `runtime` stages) follows the
+  symlink and copies its target's content; the entrypoint launches
+  `ros2 launch realsense2_camera rs_launch.py config_file:=/camera_config.yaml
+  initial_reset:=true` when that file is non-empty, otherwise runs the stock
+  default `CMD` unchanged. The default target
+  `config/realsense/custom/none.yaml` is an empty file, so the out-of-the-box
+  behavior is exactly the stock upstream default (640x480x30, aligned).
+  Activate a profile by repointing the symlink or passing
+  `--build-arg CAMERA_CONFIG=config/realsense/custom/usb2.yaml`.
+- `config/realsense/custom/usb2.yaml`: validated USB2-friendly profile
+  (color 640x480@15 + depth 480x270@15, aligned; infra/IMU off), plus
+  `config/realsense/custom/none.yaml` (empty stock marker).
+- Vendored-verbatim upstream example configs under `config/realsense/`
+  (`config.yaml`, `global_settings.yaml`, `d500_tables/*.json`) with a
+  `config/realsense/README.md` documenting the provenance, and
+  `script/check_configs_sync.sh` + a `check-configs` job in
+  `.github/workflows/upstream-bump.yaml` that diffs them against upstream at
+  the pinned `REALSENSE_ROS_VERSION` and annotates a `::warning` on drift
+  (mirrors the udev-rules drift job; advisory only, no auto-PR).
+- `test/smoke/camera_config.bats` (5 tests): asserts the `camera.yaml` symlink
+  resolves into the image, the default config is empty, and the entrypoint /
+  Dockerfile carry the `[ -s ]` config-file wiring.
 - `script/hooks/pre/build.sh` (base #440 pre-build hook): for a local
   `just build` / `./build.sh` (with `LIBREALSENSE_IMAGE` unset) it auto-builds
   `librealsense:local` from `docker/librealsense/Dockerfile` before the main

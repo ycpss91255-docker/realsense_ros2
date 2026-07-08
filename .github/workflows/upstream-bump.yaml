@@ -80,3 +80,16 @@ jobs:
           if ! script/check_udev_rules_sync.sh; then
             echo "::warning file=config/realsense/99-realsense-libusb.rules::Vendored RealSense udev rules have drifted from the pinned SDK tag; re-vendor from upstream."
           fi
+
+  check-configs:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Flag vendored config drift
+        run: |
+          if ! script/check_configs_sync.sh; then
+            echo "::warning file=config/realsense/config.yaml::Vendored RealSense example configs have drifted from the pinned realsense-ros tag; re-vendor from upstream."
+          fi
