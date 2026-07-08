@@ -36,12 +36,14 @@ ARG LIBREALSENSE_VERSION
 
 SHELL ["/bin/bash", "-x", "-euo", "pipefail", "-c"]
 
-# librealsense source-build deps (Intel's official Ubuntu list). ca-certificates
-# is explicit here: the ubuntu:${UBUNTU_CODENAME} base is barer than the old
-# ros-base and ships none, so the https git clone below would fail TLS without
-# it (ros-base pulled it in transitively).
+# librealsense source-build deps (Intel's official Ubuntu list). Two things the
+# leaner ubuntu:${UBUNTU_CODENAME} base needs that the old ros-base handled for
+# us: ca-certificates (explicit -- ros-base pulled it in transitively; without
+# it the https git clone below fails TLS), and DEBIAN_FRONTEND=noninteractive on
+# the install (the GTK/GL deps pull in tzdata, whose postinst prompts for a
+# timezone on this TTY-less build otherwise, wedging it indefinitely).
 RUN apt-get update && \
-    apt-get install -y --no-install-recommends \
+    DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
         ca-certificates \
         git \
         wget \
