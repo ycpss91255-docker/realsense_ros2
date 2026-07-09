@@ -21,10 +21,12 @@ versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - `config/realsense/custom/usb2.yaml`: validated USB2-friendly profile
   (color 640x480@15 + depth 480x270@15, aligned; infra/IMU off), plus
   `config/realsense/custom/none.yaml` (empty stock marker).
-- Vendored-verbatim upstream example configs under `config/realsense/`
-  (`config.yaml`, `global_settings.yaml`, `d500_tables/*.json`) with a
-  `config/realsense/README.md` documenting the provenance, and
-  `script/check_configs_sync.sh` + a `check-configs` job in
+- Vendored-verbatim upstream example configs under
+  `config/realsense/official/` (`config.yaml`, `global_settings.yaml`,
+  `d500_tables/*.json`), kept in their own folder separate from our
+  `config/realsense/custom/` profiles; provenance and the custom-vs-official
+  split are documented in the repo README (Camera Config section, with i18n),
+  and `script/check_configs_sync.sh` + a `check-configs` job in
   `.github/workflows/upstream-bump.yaml` that diffs them against upstream at
   the pinned `REALSENSE_ROS_VERSION` and annotates a `::warning` on drift
   (mirrors the udev-rules drift job; advisory only, no auto-PR).
