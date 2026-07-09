@@ -280,7 +280,7 @@ udev 规则必须装在 **host**，而不仅仅是容器内。容器没有 `udev
 ./script/install_udev_rules.sh
 ```
 
-脚本会把 `config/realsense/99-realsense-libusb.rules` 复制到 `/etc/udev/rules.d/`
+脚本会把 `config/realsense/official/99-realsense-libusb.rules` 复制到 `/etc/udev/rules.d/`
 并重新加载 udev，之后请重新插拔相机。容器本身以 `privileged` 模式运行并挂载 `/dev`。
 
 ### 相机配置（Camera Config）
@@ -323,21 +323,19 @@ USB 3 端口退回 USB 2 的 Raspberry Pi 5（arm64）上验证。
 
 #### `official/` -- vendored 上游（请勿手改）
 
-`config/realsense/official/` 下的文件是自 `IntelRealSense/realsense-ros` 在
-Dockerfile ARG `REALSENSE_ROS_VERSION` 固定 tag **verbatim** vendored，作为漂移
-检查基准：
+`config/realsense/official/` 下的文件是自上游固定 tag **verbatim** vendored，作为漂移
+检查基准。有两个上游喂这个文件夹 -- `realsense-ros` wrapper（由
+`REALSENSE_ROS_VERSION` 固定）与 `librealsense` SDK（由 `LIBREALSENSE_VERSION` 固定）：
 
-| 文件 | 上游来源（realsense-ros @ tag） |
-|------|----------------------------------|
-| `config.yaml` | `realsense2_camera/examples/launch_params_from_file/config/config.yaml` |
-| `global_settings.yaml` | 由 `realsense2_camera/CMakeLists.txt` 生成（默认 `USE_LIFECYCLE_NODE=OFF` -> `use_lifecycle_node: false`） |
-| `d500_tables/*.json` | `realsense2_camera/examples/d500_tables/*.json` |
+| 文件 | 上游来源 @ 固定 tag | 漂移检查 |
+|------|----------------------|----------|
+| `config.yaml` | realsense-ros `realsense2_camera/examples/launch_params_from_file/config/config.yaml` | `check_configs_sync.sh` |
+| `global_settings.yaml` | realsense-ros `realsense2_camera/CMakeLists.txt`（默认 `USE_LIFECYCLE_NODE=OFF` -> `use_lifecycle_node: false`） | `check_configs_sync.sh` |
+| `d500_tables/*.json` | realsense-ros `realsense2_camera/examples/d500_tables/*.json` | （无） |
+| `99-realsense-libusb.rules` | librealsense `config/99-realsense-libusb.rules` | `check_udev_rules_sync.sh` |
 
-`.github/workflows/upstream-bump.yaml` 会计划执行漂移检查
-（`script/check_configs_sync.sh`），把 `config.yaml` / `global_settings.yaml` 与固定
-tag 的上游 diff，偏离时发出警告。上游升级时请重新 vendored，不要就地修改。
-（`99-realsense-libusb.rules` 以相同方式 vendored，但绑 `LIBREALSENSE_VERSION`，由
-`script/check_udev_rules_sync.sh` 监看。）
+`.github/workflows/upstream-bump.yaml` 会计划执行两个漂移检查，任一 vendored 副本偏离
+其固定上游时发出警告。上游升级时请重新 vendored，不要就地修改。
 
 ## 架构
 
@@ -413,8 +411,8 @@ realsense_ros2/
 │   ├── docker/
 │   │   └── setup.conf           # 配置面（.env/compose.yaml 由此生成）
 │   └── realsense/
-│       ├── 99-realsense-libusb.rules  # RealSense udev 规则（vendored 自 librealsense）
-│       ├── official/                  # 自 realsense-ros verbatim vendored（受漂移检查）
+│       ├── official/                  # 自上游 verbatim vendored（受漂移检查）
+│       │   ├── 99-realsense-libusb.rules  # RealSense udev 规则（vendored 自 librealsense SDK）
 │       │   ├── config.yaml            # vendored 示例配置（realsense-ros）
 │       │   ├── global_settings.yaml   # vendored 示例配置（realsense-ros）
 │       │   └── d500_tables/           # vendored D500 示例 JSON 表（realsense-ros）
