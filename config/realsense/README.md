@@ -33,3 +33,31 @@ stays clean:
 The root `camera.yaml` symlink selects the active profile; the Dockerfile
 `COPY`s its target to `/camera_config.yaml` and the entrypoint launches the
 camera with it when the file is non-empty (empty -> stock upstream default).
+
+Activate a profile by repointing the symlink or overriding the build arg:
+
+```bash
+ln -sf config/realsense/custom/usb2.yaml camera.yaml   # activate USB 2 profile
+ln -sf config/realsense/custom/none.yaml camera.yaml   # back to stock defaults
+./script/build.sh --build-arg CAMERA_CONFIG=config/realsense/custom/usb2.yaml
+```
+
+### `usb2.yaml` rationale
+
+A D435/D455 on a USB 2 link cannot sustain the stock 640x480x30 color + depth:
+the camera negotiates the link but delivers **0 frames** at 30 fps. The profile
+trims bandwidth until the streams fit a 480 Mbps link. `rs_launch.py` consumes
+these keys via `config_file:=`; unset keys fall back to the node defaults.
+
+- **color 640x480 @ 15 fps** (`rgb_camera.color_profile`) -- 30 fps yields 0
+  frames on USB 2; 15 fps streams.
+- **depth 480x270 @ 15 fps** (`depth_module.depth_profile`) -- depth is dropped
+  below color so both fit the link side by side.
+- **aligned depth on** (`align_depth.enable`) -- the aligned-depth topic is the
+  point of the image.
+- **IR (`enable_infra1/2`) and IMU (`enable_gyro/accel`) off** -- both are pure
+  bandwidth the USB 2 link cannot spare.
+
+Validated on a Raspberry Pi 5 (arm64) whose USB 3 ports could not bring a D455
+up to SuperSpeed; the camera fell back to USB 2 and only streamed with this
+profile. See the repo issues for the full diagnosis.
