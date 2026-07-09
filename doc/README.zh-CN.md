@@ -306,11 +306,38 @@ ln -sf config/realsense/custom/usb2.yaml camera.yaml
 ./script/build.sh --build-arg CAMERA_CONFIG=config/realsense/custom/usb2.yaml
 ```
 
-`config/realsense/custom/usb2.yaml` 是我们验证过的 USB2 profile（color
-640x480@15 + depth 480x270@15，对齐；infra/IMU 关闭）。`config/realsense/` 下
-直接的文件是自 realsense-ros verbatim vendored，并由 `check_configs_sync.sh`
-漂移检查监看；自己的 profile 请放 `config/realsense/custom/`。详见
-[config/realsense/README.md](../config/realsense/README.md)。
+`config/realsense/` 将**我们自己的** profile 与**vendored 上游**配置分开存放：
+
+#### `custom/` -- 我们的 profile
+
+| 文件 | 用途 |
+|------|------|
+| `none.yaml` | 空的 0-byte 标记 = 原厂/默认行为（不套用任何配置）。`camera.yaml` symlink 默认指向这里。 |
+| `usb2.yaml` | USB2 友好 profile：color 640x480@15 + depth 480x270@15，对齐；infra/IMU 关闭。 |
+
+D435/D455 接 USB 2 连接时无法承载原厂的 640x480x30 color + depth（相机会协商连接
+但在 30 fps 下送出 **0 帧**），因此 `usb2.yaml` 把带宽缩到可塞进 480 Mbps 连接：
+color 与 depth 都降到 15 fps、depth 降到 480x270，并关闭连接无法负担的 infra
+（`enable_infra1/2`）与 IMU（`enable_gyro/accel`）流；对齐深度保持开启。已在
+USB 3 端口退回 USB 2 的 Raspberry Pi 5（arm64）上验证。
+
+#### `official/` -- vendored 上游（请勿手改）
+
+`config/realsense/official/` 下的文件是自 `IntelRealSense/realsense-ros` 在
+Dockerfile ARG `REALSENSE_ROS_VERSION` 固定 tag **verbatim** vendored，作为漂移
+检查基准：
+
+| 文件 | 上游来源（realsense-ros @ tag） |
+|------|----------------------------------|
+| `config.yaml` | `realsense2_camera/examples/launch_params_from_file/config/config.yaml` |
+| `global_settings.yaml` | 由 `realsense2_camera/CMakeLists.txt` 生成（默认 `USE_LIFECYCLE_NODE=OFF` -> `use_lifecycle_node: false`） |
+| `d500_tables/*.json` | `realsense2_camera/examples/d500_tables/*.json` |
+
+`.github/workflows/upstream-bump.yaml` 会计划执行漂移检查
+（`script/check_configs_sync.sh`），把 `config.yaml` / `global_settings.yaml` 与固定
+tag 的上游 diff，偏离时发出警告。上游升级时请重新 vendored，不要就地修改。
+（`99-realsense-libusb.rules` 以相同方式 vendored，但绑 `LIBREALSENSE_VERSION`，由
+`script/check_udev_rules_sync.sh` 监看。）
 
 ## 架构
 
@@ -386,11 +413,11 @@ realsense_ros2/
 │   ├── docker/
 │   │   └── setup.conf           # 配置面（.env/compose.yaml 由此生成）
 │   └── realsense/
-│       ├── README.md                  # vendored-verbatim 配置说明
 │       ├── 99-realsense-libusb.rules  # RealSense udev 规则（vendored 自 librealsense）
-│       ├── config.yaml                # vendored 示例配置（realsense-ros）
-│       ├── global_settings.yaml       # vendored 示例配置（realsense-ros）
-│       ├── d500_tables/               # vendored D500 示例 JSON 表（realsense-ros）
+│       ├── official/                  # 自 realsense-ros verbatim vendored（受漂移检查）
+│       │   ├── config.yaml            # vendored 示例配置（realsense-ros）
+│       │   ├── global_settings.yaml   # vendored 示例配置（realsense-ros）
+│       │   └── d500_tables/           # vendored D500 示例 JSON 表（realsense-ros）
 │       └── custom/                    # 我们自己的 profile（与 vendored 分开）
 │           ├── none.yaml              # 空文件 = 原厂/默认（camera.yaml 默认目标）
 │           └── usb2.yaml              # USB2 友好 profile（640x480@15 + 480x270@15，对齐）

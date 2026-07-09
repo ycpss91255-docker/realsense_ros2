@@ -91,5 +91,5 @@ jobs:
       - name: Flag vendored config drift
         run: |
           if ! script/check_configs_sync.sh; then
-            echo "::warning file=config/realsense/config.yaml::Vendored RealSense example configs have drifted from the pinned realsense-ros tag; re-vendor from upstream."
+            echo "::warning file=config/realsense/official/config.yaml::Vendored RealSense example configs have drifted from the pinned realsense-ros tag; re-vendor from upstream."
           fi

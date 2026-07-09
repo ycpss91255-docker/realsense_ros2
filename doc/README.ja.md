@@ -324,12 +324,41 @@ ln -sf config/realsense/custom/usb2.yaml camera.yaml
 ./script/build.sh --build-arg CAMERA_CONFIG=config/realsense/custom/usb2.yaml
 ```
 
-`config/realsense/custom/usb2.yaml` は検証済みの USB2 profile です（color
-640x480@15 + depth 480x270@15、整列；infra/IMU オフ）。`config/realsense/`
-直下のファイルは realsense-ros から verbatim で vendored され、
-`check_configs_sync.sh` のドリフトチェックで監視されます。独自 profile は
-`config/realsense/custom/` に置いてください。詳細は
-[config/realsense/README.md](../config/realsense/README.md) を参照。
+`config/realsense/` は**独自の** profile と**vendored された上流**設定を分けて
+保管します：
+
+#### `custom/` -- 独自 profile
+
+| ファイル | 用途 |
+|----------|------|
+| `none.yaml` | 空の 0-byte マーカー = 標準/デフォルト動作（設定を適用しない）。`camera.yaml` symlink のデフォルト対象。 |
+| `usb2.yaml` | USB2 向け profile：color 640x480@15 + depth 480x270@15、整列；infra/IMU オフ。 |
+
+D435/D455 は USB 2 接続では標準の 640x480x30 color + depth を維持できず（カメラは
+リンクをネゴシエートするが 30 fps では **0 フレーム**しか出さない）、`usb2.yaml` は
+480 Mbps のリンクに収まるよう帯域を削ります：color と depth を 15 fps に、depth を
+480x270 に下げ、リンクに余裕のない infra（`enable_infra1/2`）と IMU
+（`enable_gyro/accel`）ストリームをオフにします。整列深度は有効のままです。USB 3
+ポートが USB 2 に落ちる Raspberry Pi 5（arm64）で検証済みです。
+
+#### `official/` -- vendored 上流（手動編集しないこと）
+
+`config/realsense/official/` 直下のファイルは Dockerfile ARG
+`REALSENSE_ROS_VERSION` でピン留めした tag の `IntelRealSense/realsense-ros` から
+**verbatim** で vendored され、ドリフトチェックの基準になります：
+
+| ファイル | 上流ソース（realsense-ros @ tag） |
+|----------|-------------------------------------|
+| `config.yaml` | `realsense2_camera/examples/launch_params_from_file/config/config.yaml` |
+| `global_settings.yaml` | `realsense2_camera/CMakeLists.txt` が生成（デフォルト `USE_LIFECYCLE_NODE=OFF` -> `use_lifecycle_node: false`） |
+| `d500_tables/*.json` | `realsense2_camera/examples/d500_tables/*.json` |
+
+`.github/workflows/upstream-bump.yaml` がドリフトチェック
+（`script/check_configs_sync.sh`）を定期実行し、`config.yaml` /
+`global_settings.yaml` をピン留め tag の上流と diff して乖離時に警告します。上流の
+バージョン更新時はその場で編集せず再 vendored してください。
+（`99-realsense-libusb.rules` も同様に vendored されますが `LIBREALSENSE_VERSION` に
+紐づき、`script/check_udev_rules_sync.sh` が監視します。）
 
 ## アーキテクチャ
 
@@ -405,11 +434,11 @@ realsense_ros2/
 │   ├── docker/
 │   │   └── setup.conf           # 設定サーフェス（.env/compose.yaml はここから生成）
 │   └── realsense/
-│       ├── README.md                  # vendored-verbatim 設定の説明
 │       ├── 99-realsense-libusb.rules  # RealSense udev ルール（librealsense から vendored）
-│       ├── config.yaml                # vendored サンプル設定（realsense-ros）
-│       ├── global_settings.yaml       # vendored サンプル設定（realsense-ros）
-│       ├── d500_tables/               # vendored D500 サンプル JSON テーブル（realsense-ros）
+│       ├── official/                  # realsense-ros から verbatim vendored（ドリフト監視対象）
+│       │   ├── config.yaml            # vendored サンプル設定（realsense-ros）
+│       │   ├── global_settings.yaml   # vendored サンプル設定（realsense-ros）
+│       │   └── d500_tables/           # vendored D500 サンプル JSON テーブル（realsense-ros）
 │       └── custom/                    # 独自の profile（vendored とは分離）
 │           ├── none.yaml              # 空ファイル = 標準/デフォルト（camera.yaml のデフォルト対象）
 │           └── usb2.yaml              # USB2 向け profile（640x480@15 + 480x270@15、整列）
