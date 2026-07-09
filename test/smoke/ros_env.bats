@@ -145,6 +145,24 @@ setup() {
     assert [ -f "/etc/udev/rules.d/99-realsense-libusb.rules" ]
 }
 
+@test "camera config is mode 0644 and readable by the container user" {
+    # COPY --chmod=0644 bakes /camera_config.yaml world-readable so the non-root
+    # entrypoint can [ -s ] / read it. A mode regression would silently disable
+    # an active profile.
+    run stat -c '%a' /camera_config.yaml
+    assert_success
+    assert_output "644"
+    assert [ -r "/camera_config.yaml" ]
+}
+
+@test "RealSense udev rules are mode 0644" {
+    # COPY --chmod=0644 for the vendored rules; udev requires them world-readable
+    # to apply, so guard the mode alongside their presence.
+    run stat -c '%a' /etc/udev/rules.d/99-realsense-libusb.rules
+    assert_success
+    assert_output "644"
+}
+
 @test "Work directory exists" {
     assert [ -d "${HOME}/work" ]
 }

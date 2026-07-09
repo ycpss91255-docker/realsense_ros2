@@ -13,7 +13,10 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 readonly SCRIPT_DIR
-readonly DOCKERFILE="${SCRIPT_DIR}/../Dockerfile"
+# Overridable so a sourcing test can point current_arg / set_arg at a fixture
+# Dockerfile; unset in real use, it resolves to the repo Dockerfile as before.
+DOCKERFILE="${DOCKERFILE:-${SCRIPT_DIR}/../Dockerfile}"
+readonly DOCKERFILE
 readonly LIBREALSENSE_REPO="IntelRealSense/librealsense"
 readonly REALSENSE_ROS_REPO="IntelRealSense/realsense-ros"
 
@@ -106,4 +109,8 @@ main() {
   return 0
 }
 
-main "${@}"
+# Run main only when executed directly, so tests can source this file and
+# exercise the pure helpers (current_arg / set_arg).
+if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
+  main "${@}"
+fi

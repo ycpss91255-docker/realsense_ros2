@@ -108,6 +108,19 @@ versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   -- repo previously had no LICENSE and no badges. Aligns with
   the org-wide Apache 2.0 migration tracked across 17 sister
   repos.
+- Behavioral smoke coverage for the repo's helper scripts. `entrypoint.sh`,
+  `install_udev_rules.sh`, `check_configs_sync.sh` and `bump_realsense_versions.sh`
+  gained a `[[ "${BASH_SOURCE[0]}" == "${0}" ]]` source-guard (behavior-neutral:
+  the real entrypoint still sources ROS and execs the CMD unchanged) so their pure
+  functions are unit-testable. `entrypoint.sh` factors the camera-config gate into
+  `_apply_camera_config` (resolving `CONFIGURED_ARGV` without executing).
+  `test/smoke/camera_config.bats` now exercises the gate behaviorally (empty vs
+  active config, `ros2 launch` vs `bash` / `ros2 run`); new
+  `test/smoke/check_configs_sync.bats` and `test/smoke/bump_realsense_versions.bats`
+  cover the CMake `use_lifecycle_node` parser and the ARG read/rewrite helpers;
+  `test/smoke/install_udev_rules.bats` adds the `check_udev_rules_sync.sh` help
+  block and `run_privileged` / arg-guard error branches; `test/smoke/ros_env.bats`
+  asserts the baked config + udev-rules file modes. Smoke total 75 -> 99.
 
 ### Changed
 - librealsense is now consumed from a parameterized prebuilt SDK image instead
