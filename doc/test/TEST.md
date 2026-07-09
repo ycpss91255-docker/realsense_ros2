@@ -1,6 +1,6 @@
 # TEST.md
 
-**75 tests** total.
+**99 tests** total.
 
 ## test/smoke/ros_env.bats
 
@@ -37,7 +37,7 @@
 | `sudo is available` | sudo command works |
 | `sudo passwordless works` | sudo runs without password |
 
-### System (9)
+### System (11)
 
 | Test | Description |
 |------|-------------|
@@ -50,6 +50,8 @@
 | `LC_ALL is en_US.UTF-8` | LC_ALL locale set |
 | `entrypoint.sh exists and executable` | `/entrypoint.sh` is executable |
 | `RealSense udev rules exist` | udev rules file exists |
+| `camera config is mode 0644 and readable by the container user` | `/camera_config.yaml` is mode 0644 and readable so the non-root entrypoint can read an active profile |
+| `RealSense udev rules are mode 0644` | Vendored udev rules file is mode 0644 (world-readable, as udev requires) |
 
 ### Workspace (1)
 
@@ -59,13 +61,53 @@
 
 ## test/smoke/install_udev_rules.bats
 
-### install_udev_rules.sh (3)
+### install_udev_rules.sh (8)
 
 | Test | Description |
 |------|-------------|
 | `install_udev_rules.sh -h exits 0` | Help exits successfully |
 | `install_udev_rules.sh --help exits 0` | Help exits successfully |
 | `install_udev_rules.sh -h prints usage` | Help output contains "Usage:" |
+| `install_udev_rules.sh is executable` | Script carries the executable bit (documented direct-run) |
+| `install_udev_rules.sh rejects an unknown argument with usage (exit 1)` | Unknown arg prints usage and exits 1 |
+| `install_udev_rules.sh fails when the rules source is missing (exit 1)` | Missing RULES_SRC guard returns 1 before any privileged step |
+| `run_privileged runs the command directly when root (EUID=0)` | Root branch runs the command directly (sourced under sudo) |
+| `run_privileged fails when non-root with no sudo available (exit 1)` | Non-root + no sudo on PATH returns 1 with an error |
+
+### check_udev_rules_sync.sh (4)
+
+| Test | Description |
+|------|-------------|
+| `check_udev_rules_sync.sh -h exits 0` | Help exits successfully |
+| `check_udev_rules_sync.sh --help exits 0` | Help exits successfully |
+| `check_udev_rules_sync.sh -h prints usage` | Help output contains "Usage:" |
+| `check_udev_rules_sync.sh is executable` | Script carries the executable bit |
+
+## test/smoke/check_configs_sync.bats
+
+### check_configs_sync.sh (6)
+
+| Test | Description |
+|------|-------------|
+| `check_configs_sync.sh -h exits 0` | Help exits successfully |
+| `check_configs_sync.sh --help exits 0` | Help exits successfully |
+| `check_configs_sync.sh -h prints usage` | Help output contains "Usage:" |
+| `check_configs_sync.sh is executable` | Script carries the executable bit |
+| `extract_global_default reads the OFF (else) branch default from CMakeLists` | Parser returns `use_lifecycle_node: false` from a fixture with the USE_LIFECYCLE_NODE block |
+| `extract_global_default returns nothing when the block is absent (drift path)` | Parser returns empty when the block is missing (drift) |
+
+## test/smoke/bump_realsense_versions.bats
+
+### bump_realsense_versions.sh (6)
+
+| Test | Description |
+|------|-------------|
+| `bump_realsense_versions.sh -h exits 0` | Help exits successfully |
+| `bump_realsense_versions.sh --help exits 0` | Help exits successfully |
+| `bump_realsense_versions.sh -h prints usage` | Help output contains "Usage:" |
+| `bump_realsense_versions.sh is executable` | Script carries the executable bit |
+| `current_arg returns the pinned value from the Dockerfile ARG` | Parser reads a pinned ARG value from a fixture Dockerfile |
+| `set_arg rewrites only the target ARG line (round-trip; others untouched)` | Rewriter updates the target ARG and leaves other ARG lines unchanged |
 
 ## test/smoke/dockerfile_guards.bats
 
@@ -82,15 +124,16 @@
 
 ## test/smoke/camera_config.bats
 
-### Camera-config wiring (5)
+### Camera-config wiring (6)
 
 | Test | Description |
 |------|-------------|
 | `camera.yaml symlink resolved into the image (/camera_config.yaml exists)` | Docker COPY followed the root `camera.yaml` symlink; `/camera_config.yaml` is present |
-| `default camera config is empty (stock upstream default)` | Default target `config/realsense/custom/none.yaml` is 0 bytes so the `[ -s ]` guard is false |
-| `entrypoint gates the camera launch on a non-empty config ([ -s ])` | `/entrypoint.sh` carries the `[ -s "${_camera_config}" ]` conditional |
-| `entrypoint launches rs_launch.py with config_file when a config is active` | Entrypoint execs `config_file:=` + `initial_reset:=true` on an active config |
-| `Dockerfile declares CAMERA_CONFIG and COPYs it to /camera_config.yaml` | `ARG CAMERA_CONFIG="camera.yaml"` + the `COPY ... /camera_config.yaml` wiring is present |
+| `default baked camera config is empty (stock upstream default)` | Default target `config/realsense/custom/none.yaml` is 0 bytes so the `[ -s ]` guard is false |
+| `entrypoint leaves the stock launch unchanged for an empty config` | `_apply_camera_config` leaves the `ros2 launch` argv untouched when the config is empty |
+| `entrypoint applies config_file:= for a non-empty camera config` | `_apply_camera_config` resolves `config_file:=` + `initial_reset:=true` on an active config |
+| `entrypoint does not hijack a non-launch command even with a config` | A baked profile does not turn the devel `bash` CMD into a camera launch |
+| `entrypoint does not hijack ros2 run (only ros2 launch) even with a config` | `ros2 run ...` passes through unchanged; only `ros2 launch` is gated |
 
 ## .base/test/smoke/script_help.bats
 

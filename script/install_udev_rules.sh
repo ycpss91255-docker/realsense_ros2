@@ -73,4 +73,8 @@ main() {
   echo "Done. Re-plug the RealSense camera if it is already connected."
 }
 
-main "${@}"
+# Run main only when executed directly, so tests can source this file and
+# exercise the pure helpers (run_privileged / the arg + RULES_SRC guards).
+if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
+  main "${@}"
+fi
