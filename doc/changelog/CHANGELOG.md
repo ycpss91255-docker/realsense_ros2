@@ -21,9 +21,10 @@ versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - `config/realsense/custom/usb2.yaml`: validated USB2-friendly profile
   (color 640x480@15 + depth 480x270@15, aligned; infra/IMU off), plus
   `config/realsense/custom/none.yaml` (empty stock marker).
-- Vendored-verbatim upstream example configs under
-  `config/realsense/official/` (`config.yaml`, `global_settings.yaml`,
-  `d500_tables/*.json`), kept in their own folder separate from our
+- Vendored upstream files under `config/realsense/official/`
+  (`config.yaml`, `global_settings.yaml`, `d500_tables/*.json` from
+  realsense-ros, and the `99-realsense-libusb.rules` udev rules vendored from
+  the librealsense SDK), kept in their own folder separate from our
   `config/realsense/custom/` profiles; provenance and the custom-vs-official
   split are documented in the repo README (Camera Config section, with i18n),
   and `script/check_configs_sync.sh` + a `check-configs` job in
@@ -57,7 +58,7 @@ versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   is a bespoke Action driven by `script/bump_realsense_versions.sh`. A second
   job runs `script/check_udev_rules_sync.sh` and annotates on drift (#97).
 - `script/check_udev_rules_sync.sh`: diffs the vendored
-  `config/realsense/99-realsense-libusb.rules` against upstream at the pinned
+  `config/realsense/official/99-realsense-libusb.rules` against upstream at the pinned
   `LIBREALSENSE_VERSION`; a provenance/sync header on the rules file documents
   the vendoring. The runtime smoke gains a `ros2 pkg prefix realsense2_camera`
   ament-marker check (catches a missed marker from the source-build staging) (#97).

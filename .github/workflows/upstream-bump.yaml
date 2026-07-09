@@ -66,7 +66,7 @@ jobs:
           drop-in. Merge gate: CI green on the full matrix
           (humble+jazzy x amd64+arm64) AND a manual D455-on-Pi5 aligned-depth
           run, per issue #97. If the udev-rules sync check reports drift,
-          re-vendor config/realsense/99-realsense-libusb.rules before merge."
+          re-vendor config/realsense/official/99-realsense-libusb.rules before merge."
 
   check-udev-rules:
     runs-on: ubuntu-latest
@@ -78,7 +78,7 @@ jobs:
       - name: Flag vendored udev-rules drift
         run: |
           if ! script/check_udev_rules_sync.sh; then
-            echo "::warning file=config/realsense/99-realsense-libusb.rules::Vendored RealSense udev rules have drifted from the pinned SDK tag; re-vendor from upstream."
+            echo "::warning file=config/realsense/official/99-realsense-libusb.rules::Vendored RealSense udev rules have drifted from the pinned SDK tag; re-vendor from upstream."
           fi
 
   check-configs:

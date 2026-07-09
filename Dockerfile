@@ -311,7 +311,7 @@ COPY --chown="${USER}":"${GROUP}" --chmod=0755 "${CONFIG_SRC}" "${CONFIG_DIR}"
 
 # Copy RealSense udev rules
 RUN mkdir -p /etc/udev/rules.d
-COPY --chmod=0644 config/realsense/99-realsense-libusb.rules /etc/udev/rules.d/
+COPY --chmod=0644 config/realsense/official/99-realsense-libusb.rules /etc/udev/rules.d/
 
 USER "${USER}"
 
@@ -441,7 +441,7 @@ RUN apt-get update && \
 
 # Copy RealSense udev rules
 RUN mkdir -p /etc/udev/rules.d
-COPY --chmod=0644 config/realsense/99-realsense-libusb.rules /etc/udev/rules.d/
+COPY --chmod=0644 config/realsense/official/99-realsense-libusb.rules /etc/udev/rules.d/
 
 # Optional camera config (see the devel stage's CAMERA_CONFIG note). Default
 # target is the EMPTY none.yaml -> /camera_config.yaml is 0 bytes -> stock
