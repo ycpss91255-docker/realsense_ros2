@@ -129,7 +129,7 @@
 | Test | Description |
 |------|-------------|
 | `camera.yaml symlink resolved into the image (/camera_config.yaml exists)` | Docker COPY followed the root `camera.yaml` symlink; `/camera_config.yaml` is present |
-| `default baked camera config is empty (stock upstream default)` | Default target `config/realsense/custom/none.yaml` is 0 bytes so the `[ -s ]` guard is false |
+| `default baked camera config is empty (stock upstream default)` | Default target `config/realsense/yaml/custom/none.yaml` is 0 bytes so the `[ -s ]` guard is false |
 | `entrypoint leaves the stock launch unchanged for an empty config` | `_apply_camera_config` leaves the `ros2 launch` argv untouched when the config is empty |
 | `entrypoint applies config_file:= for a non-empty camera config` | `_apply_camera_config` resolves `config_file:=` + `initial_reset:=true` on an active config |
 | `entrypoint does not hijack a non-launch command even with a config` | A baked profile does not turn the devel `bash` CMD into a camera launch |

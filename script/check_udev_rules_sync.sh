@@ -2,7 +2,7 @@
 #
 # Check the vendored RealSense udev rules against upstream at the pinned SDK tag.
 #
-# config/realsense/official/99-realsense-libusb.rules is vendored from
+# config/realsense/udev/99-realsense-libusb.rules is vendored from
 # IntelRealSense/librealsense at the tag in the Dockerfile ARG
 # LIBREALSENSE_VERSION. This script parses that tag, fetches the upstream
 # config/99-realsense-libusb.rules at that tag, and diffs it against the
@@ -14,14 +14,14 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 readonly SCRIPT_DIR
 readonly REPO_ROOT="${SCRIPT_DIR}/.."
 readonly DOCKERFILE="${REPO_ROOT}/Dockerfile"
-readonly RULES_LOCAL="${REPO_ROOT}/config/realsense/official/99-realsense-libusb.rules"
+readonly RULES_LOCAL="${REPO_ROOT}/config/realsense/udev/99-realsense-libusb.rules"
 readonly UPSTREAM_PATH="config/99-realsense-libusb.rules"
 
 usage() {
   cat >&2 <<'EOF'
 Usage: check_udev_rules_sync.sh [-h|--help]
 
-Diff the vendored config/realsense/official/99-realsense-libusb.rules against the
+Diff the vendored config/realsense/udev/99-realsense-libusb.rules against the
 upstream IntelRealSense/librealsense file at the SDK tag pinned in the
 Dockerfile ARG LIBREALSENSE_VERSION.
 

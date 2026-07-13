@@ -1,0 +1,12 @@
+# UNVERIFIED USB2 profile: color 1280x720x6, aligned depth 1280x720x6. IR and
+# IMU off. The USB2 whitelist was not enumerated (camera was on a USB3 link); 720p
+# depth may exceed USB2 bandwidth or not be offered -- verify on a real USB2 link.
+enable_color: true
+rgb_camera.color_profile: 1280x720x6
+enable_depth: true
+depth_module.depth_profile: 1280x720x6
+align_depth.enable: true
+enable_infra1: false
+enable_infra2: false
+enable_gyro: false
+enable_accel: false

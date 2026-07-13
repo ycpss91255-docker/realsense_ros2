@@ -14,18 +14,24 @@ versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   `ros2 launch realsense2_camera rs_launch.py config_file:=/camera_config.yaml
   initial_reset:=true` when that file is non-empty, otherwise runs the stock
   default `CMD` unchanged. The default target
-  `config/realsense/custom/none.yaml` is an empty file, so the out-of-the-box
+  `config/realsense/yaml/custom/none.yaml` is an empty file, so the out-of-the-box
   behavior is exactly the stock upstream default (640x480x30, aligned).
   Activate a profile by repointing the symlink or passing
-  `--build-arg CAMERA_CONFIG=config/realsense/custom/usb2.yaml`.
-- `config/realsense/custom/usb2.yaml`: validated USB2-friendly profile
-  (color 640x480@15 + depth 480x270@15, aligned; infra/IMU off), plus
-  `config/realsense/custom/none.yaml` (empty stock marker).
-- Vendored upstream files under `config/realsense/official/`
+  `--build-arg CAMERA_CONFIG=config/realsense/yaml/custom/usb2_640x480p15fps.yaml`.
+- **Camera profile presets** under `config/realsense/yaml/custom/` (one file per
+  resolution at that link's max fps; depth always 1280x720, capped at 30 fps;
+  infra/IMU off; aligned depth on): four USB3 presets enumerated on a D455
+  (`usb3_1280x720p30fps`, `usb3_848x480p60fps`, `usb3_640x480p60fps`,
+  `usb3_424x240p90fps`) and three **UNVERIFIED** USB2 presets
+  (`usb2_1280x720p6fps`, `usb2_640x480p15fps`, `usb2_424x240p30fps`; the USB2
+  whitelist was not enumerated -- verify 720p depth on a real USB2 link), plus
+  `none.yaml` (empty stock marker). Refs #121.
+- Vendored upstream files under `config/realsense/yaml/official/`,
+  `config/realsense/json/official/`, and `config/realsense/udev/`
   (`config.yaml`, `global_settings.yaml`, `d500_tables/*.json` from
   realsense-ros, and the `99-realsense-libusb.rules` udev rules vendored from
-  the librealsense SDK), kept in their own folder separate from our
-  `config/realsense/custom/` profiles; provenance and the custom-vs-official
+  the librealsense SDK), kept separate from our
+  `config/realsense/yaml/custom/` profiles; provenance and the custom-vs-official
   split are documented in the repo README (Camera Config section, with i18n),
   and `script/check_configs_sync.sh` + a `check-configs` job in
   `.github/workflows/upstream-bump.yaml` that diffs them against upstream at
@@ -58,7 +64,7 @@ versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   is a bespoke Action driven by `script/bump_realsense_versions.sh`. A second
   job runs `script/check_udev_rules_sync.sh` and annotates on drift (#97).
 - `script/check_udev_rules_sync.sh`: diffs the vendored
-  `config/realsense/official/99-realsense-libusb.rules` against upstream at the pinned
+  `config/realsense/udev/99-realsense-libusb.rules` against upstream at the pinned
   `LIBREALSENSE_VERSION`; a provenance/sync header on the rules file documents
   the vendoring. The runtime smoke gains a `ros2 pkg prefix realsense2_camera`
   ament-marker check (catches a missed marker from the source-build staging) (#97).
@@ -123,6 +129,16 @@ versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   asserts the baked config + udev-rules file modes. Smoke total 75 -> 99.
 
 ### Changed
+- **`config/realsense/` restructured type-first** into `yaml/{official,custom}/`,
+  `json/official/`, and `udev/` (was `official/` + `custom/`). Vendored configs
+  now live under `yaml/official/`, the D500 JSON tables under
+  `json/official/d500_tables/`, and the udev rules under `udev/`; all references
+  (Dockerfile COPYs, `check_configs_sync.sh`, `check_udev_rules_sync.sh`,
+  `install_udev_rules.sh`, entrypoint, tests, `upstream-bump.yaml`) were repointed.
+  Refs #121.
+- `usb2_640x480p15fps.yaml` (renamed from `usb2.yaml`) now carries depth
+  1280x720x15 (was 480x270x15), following the locked rule that depth always uses
+  the camera's highest resolution. Refs #121.
 - librealsense is now consumed from a parameterized prebuilt SDK image instead
   of compiled inline in the main `devel` stage. The main Dockerfile adds a
   global `ARG LIBREALSENSE_IMAGE="librealsense:local"` + `FROM ${LIBREALSENSE_IMAGE}

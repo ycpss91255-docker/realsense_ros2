@@ -280,14 +280,14 @@ udev 规则必须装在 **host**，而不仅仅是容器内。容器没有 `udev
 ./script/install_udev_rules.sh
 ```
 
-脚本会把 `config/realsense/official/99-realsense-libusb.rules` 复制到 `/etc/udev/rules.d/`
+脚本会把 `config/realsense/udev/99-realsense-libusb.rules` 复制到 `/etc/udev/rules.d/`
 并重新加载 udev，之后请重新插拔相机。容器本身以 `privileged` 模式运行并挂载 `/dev`。
 
 ### 相机配置（Camera Config）
 
 启用中的相机 profile 由根目录的 `camera.yaml` **符号链接** 选定（比照
 `app/ros1_bridge` 的 `bridge.yaml`）。默认目标是
-`config/realsense/custom/none.yaml`，一个**空文件**，因此 runtime image 会启动
+`config/realsense/yaml/custom/none.yaml`，一个**空文件**，因此 runtime image 会启动
 原厂上游默认（640x480x30，对齐深度），行为与之前完全一致。Dockerfile 会把
 符号链接目标 COPY 成 `/camera_config.yaml`；当该文件非空时，entrypoint 会执行
 `ros2 launch realsense2_camera rs_launch.py config_file:=/camera_config.yaml
@@ -296,43 +296,64 @@ initial_reset:=true`，否则执行默认 `CMD`。
 启用某个 profile 可以重指符号链接：
 
 ```bash
-ln -sf config/realsense/custom/usb2.yaml camera.yaml
+ln -sf config/realsense/yaml/custom/usb2_640x480p15fps.yaml camera.yaml
 ./script/build.sh
 ```
 
 或不动符号链接，单次以 build arg 指定：
 
 ```bash
-./script/build.sh --build-arg CAMERA_CONFIG=config/realsense/custom/usb2.yaml
+./script/build.sh --build-arg CAMERA_CONFIG=config/realsense/yaml/custom/usb2_640x480p15fps.yaml
 ```
 
-`config/realsense/` 将**我们自己的** profile 与**vendored 上游**配置分开存放：
+`config/realsense/` 采用 **type-first** 布局，将**我们自己的** profile 与
+**vendored 上游**配置分开存放：
 
-#### `custom/` -- 我们的 profile
+```text
+config/realsense/
+├── yaml/
+│   ├── official/   # vendored realsense-ros 示例配置（漂移检查）
+│   └── custom/     # 我们的相机 profile（none + 具名 preset）
+├── json/
+│   └── official/   # vendored realsense-ros D500 示例 JSON tables
+└── udev/           # vendored librealsense udev rules
+```
 
-| 文件 | 用途 |
-|------|------|
-| `none.yaml` | 空的 0-byte 标记 = 原厂/默认行为（不套用任何配置）。`camera.yaml` symlink 默认指向这里。 |
-| `usb2.yaml` | USB2 友好 profile：color 640x480@15 + depth 480x270@15，对齐；infra/IMU 关闭。 |
+#### `yaml/custom/` -- 我们的 profile
 
-D435/D455 接 USB 2 连接时无法承载原厂的 640x480x30 color + depth（相机会协商连接
-但在 30 fps 下送出 **0 帧**），因此 `usb2.yaml` 把带宽缩到可塞进 480 Mbps 连接：
-color 与 depth 都降到 15 fps、depth 降到 480x270，并关闭连接无法负担的 infra
-（`enable_infra1/2`）与 IMU（`enable_gyro/accel`）流；对齐深度保持开启。已在
-USB 3 端口退回 USB 2 的 Raspberry Pi 5（arm64）上验证。
+每个分辨率一个 preset，采该连接的最高 fps。**depth 一律 1280x720**（相机最高深度
+分辨率），上限 30 fps。每个 preset 均关闭 infra（`enable_infra1/2`）与 IMU
+（`enable_gyro/accel`），对齐深度保持开启。`none.yaml` 是空的 0-byte 标记 =
+原厂/默认（`camera.yaml` symlink 默认指向这里）。
 
-#### `official/` -- vendored 上游（请勿手改）
+| 文件 | Color | 对齐深度 | 连接 |
+|------|-------|----------|------|
+| `none.yaml` | （空） | 原厂默认 | -- |
+| `usb3_1280x720p30fps.yaml` | 1280x720x30 | 1280x720x30 | USB3 |
+| `usb3_848x480p60fps.yaml` | 848x480x60 | 1280x720x30 | USB3 |
+| `usb3_640x480p60fps.yaml` | 640x480x60 | 1280x720x30 | USB3 |
+| `usb3_424x240p90fps.yaml` | 424x240x90 | 1280x720x30 | USB3 |
+| `usb2_1280x720p6fps.yaml` | 1280x720x6 | 1280x720x6 | USB2（未验证） |
+| `usb2_640x480p15fps.yaml` | 640x480x15 | 1280x720x15 | USB2（未验证） |
+| `usb2_424x240p30fps.yaml` | 424x240x30 | 1280x720x30 | USB2（未验证） |
 
-`config/realsense/official/` 下的文件是自上游固定 tag **verbatim** vendored，作为漂移
-检查基准。有两个上游喂这个文件夹 -- `realsense-ros` wrapper（由
-`REALSENSE_ROS_VERSION` 固定）与 `librealsense` SDK（由 `LIBREALSENSE_VERSION` 固定）：
+USB3 preset 是在 D455 上以 `rs-enumerate-devices` 枚举得到。**USB2 preset 尚未
+验证**：当时相机接在 USB3 连接，未枚举 USB2 白名单 -- 720p depth 可能超出 USB2
+带宽或根本不提供。请在真实 USB2 连接上逐一验证（D435/D455 接 USB 2 时无法承载
+原厂 640x480x30 color + depth，30 fps 下送出 **0 帧**）。
+
+#### `yaml/official/`、`json/official/`、`udev/` -- vendored 上游（请勿手改）
+
+vendored 文件是自上游固定 tag **verbatim** 复制，作为漂移检查基准。有两个上游 --
+`realsense-ros` wrapper（由 `REALSENSE_ROS_VERSION` 固定）与 `librealsense` SDK
+（由 `LIBREALSENSE_VERSION` 固定）：
 
 | 文件 | 上游来源 @ 固定 tag | 漂移检查 |
 |------|----------------------|----------|
-| `config.yaml` | realsense-ros `realsense2_camera/examples/launch_params_from_file/config/config.yaml` | `check_configs_sync.sh` |
-| `global_settings.yaml` | realsense-ros `realsense2_camera/CMakeLists.txt`（默认 `USE_LIFECYCLE_NODE=OFF` -> `use_lifecycle_node: false`） | `check_configs_sync.sh` |
-| `d500_tables/*.json` | realsense-ros `realsense2_camera/examples/d500_tables/*.json` | （无） |
-| `99-realsense-libusb.rules` | librealsense `config/99-realsense-libusb.rules` | `check_udev_rules_sync.sh` |
+| `yaml/official/config.yaml` | realsense-ros `realsense2_camera/examples/launch_params_from_file/config/config.yaml` | `check_configs_sync.sh` |
+| `yaml/official/global_settings.yaml` | realsense-ros `realsense2_camera/CMakeLists.txt`（默认 `USE_LIFECYCLE_NODE=OFF` -> `use_lifecycle_node: false`） | `check_configs_sync.sh` |
+| `json/official/d500_tables/*.json` | realsense-ros `realsense2_camera/examples/d500_tables/*.json` | （无） |
+| `udev/99-realsense-libusb.rules` | librealsense `config/99-realsense-libusb.rules` | `check_udev_rules_sync.sh` |
 
 `.github/workflows/upstream-bump.yaml` 会计划执行两个漂移检查，任一 vendored 副本偏离
 其固定上游时发出警告。上游升级时请重新 vendored，不要就地修改。
@@ -385,7 +406,7 @@ realsense_ros2/
 ├── Dockerfile                   # 多阶段构建
 ├── LICENSE
 ├── README.md
-├── camera.yaml -> config/realsense/custom/none.yaml # 符号链接（启用中的相机配置；默认 = 原厂）
+├── camera.yaml -> config/realsense/yaml/custom/none.yaml # 符号链接（启用中的相机配置；默认 = 原厂）
 ├── justfile -> .base/script/docker/justfile        # 符号链接（用户入口）
 ├── .hadolint.yaml -> .base/.hadolint.yaml          # 符号链接
 ├── .base/                       # base subtree（只读；v0.41.0）
@@ -410,15 +431,25 @@ realsense_ros2/
 ├── config/
 │   ├── docker/
 │   │   └── setup.conf           # 配置面（.env/compose.yaml 由此生成）
-│   └── realsense/
-│       ├── official/                  # 自上游 verbatim vendored（受漂移检查）
-│       │   ├── 99-realsense-libusb.rules  # RealSense udev 规则（vendored 自 librealsense SDK）
-│       │   ├── config.yaml            # vendored 示例配置（realsense-ros）
-│       │   ├── global_settings.yaml   # vendored 示例配置（realsense-ros）
-│       │   └── d500_tables/           # vendored D500 示例 JSON 表（realsense-ros）
-│       └── custom/                    # 我们自己的 profile（与 vendored 分开）
-│           ├── none.yaml              # 空文件 = 原厂/默认（camera.yaml 默认目标）
-│           └── usb2.yaml              # USB2 友好 profile（640x480@15 + 480x270@15，对齐）
+│   └── realsense/                     # type-first：yaml/ + json/ + udev/
+│       ├── yaml/
+│       │   ├── official/              # 自上游 verbatim vendored（受漂移检查）
+│       │   │   ├── config.yaml            # vendored 示例配置（realsense-ros）
+│       │   │   └── global_settings.yaml   # vendored 示例配置（realsense-ros）
+│       │   └── custom/                # 我们自己的 profile（none + 具名 preset）
+│       │       ├── none.yaml              # 空文件 = 原厂/默认（camera.yaml 默认目标）
+│       │       ├── usb3_1280x720p30fps.yaml  # USB3：color 1280x720x30，depth 1280x720x30
+│       │       ├── usb3_848x480p60fps.yaml   # USB3：color 848x480x60，depth 1280x720x30
+│       │       ├── usb3_640x480p60fps.yaml   # USB3：color 640x480x60，depth 1280x720x30
+│       │       ├── usb3_424x240p90fps.yaml   # USB3：color 424x240x90，depth 1280x720x30
+│       │       ├── usb2_1280x720p6fps.yaml   # USB2（未验证）：color 1280x720x6，depth 1280x720x6
+│       │       ├── usb2_640x480p15fps.yaml   # USB2（未验证）：color 640x480x15，depth 1280x720x15
+│       │       └── usb2_424x240p30fps.yaml   # USB2（未验证）：color 424x240x30，depth 1280x720x30
+│       ├── json/
+│       │   └── official/
+│       │       └── d500_tables/       # vendored D500 示例 JSON 表（realsense-ros）
+│       └── udev/
+│           └── 99-realsense-libusb.rules  # RealSense udev 规则（vendored 自 librealsense SDK）
 ├── doc/
 │   ├── README.zh-TW.md          # 繁体中文
 │   ├── README.zh-CN.md          # 简体中文
