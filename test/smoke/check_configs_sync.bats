@@ -5,7 +5,7 @@ setup() {
 }
 
 # -------------------- check_configs_sync.sh --------------------
-# The vendored-config drift guard: diffs config/realsense/official/{config.yaml,
+# The vendored-config drift guard: diffs config/realsense/yaml/official/{config.yaml,
 # global_settings.yaml} against upstream realsense-ros at the pinned tag. The
 # network diff is not run here; we assert the --help contract plus the pure
 # CMakeLists parser (extract_global_default) that reconstructs upstream's

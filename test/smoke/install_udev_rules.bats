@@ -43,7 +43,7 @@ setup() {
 
 @test "install_udev_rules.sh fails when the rules source is missing (exit 1)" {
     # Run directly: SCRIPT_DIR resolves to /lint, so RULES_SRC points at
-    # /config/realsense/official/99-realsense-libusb.rules, which is not copied
+    # /config/realsense/udev/99-realsense-libusb.rules, which is not copied
     # into the image -> the [ -f RULES_SRC ] guard returns 1 before any
     # privileged step.
     run bash /lint/install_udev_rules.sh

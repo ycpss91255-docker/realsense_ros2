@@ -1,0 +1,10 @@
+# USB3 profile: color 1280x720x30, aligned depth 1280x720x30. IR and IMU off.
+enable_color: true
+rgb_camera.color_profile: 1280x720x30
+enable_depth: true
+depth_module.depth_profile: 1280x720x30
+align_depth.enable: true
+enable_infra1: false
+enable_infra2: false
+enable_gyro: false
+enable_accel: false

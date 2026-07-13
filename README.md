@@ -293,7 +293,7 @@ Install them once on the host with the bundled script (uses `sudo`):
 ./script/install_udev_rules.sh
 ```
 
-It copies `config/realsense/official/99-realsense-libusb.rules` to `/etc/udev/rules.d/`
+It copies `config/realsense/udev/99-realsense-libusb.rules` to `/etc/udev/rules.d/`
 and reloads udev. Re-plug the camera afterwards. The container itself runs in
 `privileged` mode with `/dev` mounted.
 
@@ -301,7 +301,7 @@ and reloads udev. Re-plug the camera afterwards. The container itself runs in
 
 The active camera profile is selected by the root `camera.yaml` **symlink**
 (modeled on `app/ros1_bridge`'s `bridge.yaml`). Its default target is
-`config/realsense/custom/none.yaml`, an **empty** file, so the runtime image
+`config/realsense/yaml/custom/none.yaml`, an **empty** file, so the runtime image
 launches the stock upstream default (640x480x30, aligned depth) exactly as
 before. The Dockerfile COPYs the symlink target to `/camera_config.yaml`; when
 that file is non-empty the entrypoint launches
@@ -311,48 +311,67 @@ initial_reset:=true`, otherwise it runs the default `CMD`.
 Activate a profile either by repointing the symlink:
 
 ```bash
-ln -sf config/realsense/custom/usb2.yaml camera.yaml
+ln -sf config/realsense/yaml/custom/usb2_640x480p15fps.yaml camera.yaml
 ./script/build.sh
 ```
 
 or per build without touching the symlink:
 
 ```bash
-./script/build.sh --build-arg CAMERA_CONFIG=config/realsense/custom/usb2.yaml
+./script/build.sh --build-arg CAMERA_CONFIG=config/realsense/yaml/custom/usb2_640x480p15fps.yaml
 ```
 
-`config/realsense/` separates **our** profiles from the **vendored upstream**
-configs:
+`config/realsense/` is organized **type-first**, separating **our** profiles
+from the **vendored upstream** configs:
 
-#### `custom/` -- our profiles
+```text
+config/realsense/
+├── yaml/
+│   ├── official/   # vendored realsense-ros example configs (drift-checked)
+│   └── custom/     # OUR camera profiles (none + named presets)
+├── json/
+│   └── official/   # vendored realsense-ros D500 example JSON tables
+└── udev/           # vendored librealsense udev rules
+```
 
-| File | Purpose |
-|------|---------|
-| `none.yaml` | Empty 0-byte marker = stock/default behavior (no config applied). The `camera.yaml` symlink points here by default. |
-| `usb2.yaml` | USB2-friendly profile: color 640x480@15 + depth 480x270@15, aligned; infra/IMU off. |
+#### `yaml/custom/` -- our profiles
 
-A D435/D455 on a USB 2 link cannot sustain the stock 640x480x30 color + depth
-(the camera negotiates the link but delivers **0 frames** at 30 fps), so
-`usb2.yaml` trims bandwidth until the streams fit a 480 Mbps link: color and
-depth drop to 15 fps, depth to 480x270, and the infra (`enable_infra1/2`) and
-IMU (`enable_gyro/accel`) streams -- pure bandwidth the link cannot spare -- are
-turned off. Aligned depth stays on. Validated on a Raspberry Pi 5 (arm64) whose
-USB 3 port fell back to USB 2.
+One preset per resolution, at that resolution's max fps for the link. **Depth is
+always 1280x720** (the camera's highest depth resolution), capped at 30 fps.
+Infra (`enable_infra1/2`) and IMU (`enable_gyro/accel`) are off in every preset;
+aligned depth stays on. `none.yaml` is an empty 0-byte marker = stock/default
+(the `camera.yaml` symlink points here by default).
 
-#### `official/` -- vendored upstream (do not hand-edit)
+| File | Color | Aligned depth | Link |
+|------|-------|---------------|------|
+| `none.yaml` | (empty) | stock default | -- |
+| `usb3_1280x720p30fps.yaml` | 1280x720x30 | 1280x720x30 | USB3 |
+| `usb3_848x480p60fps.yaml` | 848x480x60 | 1280x720x30 | USB3 |
+| `usb3_640x480p60fps.yaml` | 640x480x60 | 1280x720x30 | USB3 |
+| `usb3_424x240p90fps.yaml` | 424x240x90 | 1280x720x30 | USB3 |
+| `usb2_1280x720p6fps.yaml` | 1280x720x6 | 1280x720x6 | USB2 (UNVERIFIED) |
+| `usb2_640x480p15fps.yaml` | 640x480x15 | 1280x720x15 | USB2 (UNVERIFIED) |
+| `usb2_424x240p30fps.yaml` | 424x240x30 | 1280x720x30 | USB2 (UNVERIFIED) |
 
-The files under `config/realsense/official/` are vendored **verbatim** from
-upstream at a pinned tag, so they can serve as a drift-check baseline. Two
-upstreams feed this folder -- the `realsense-ros` wrapper (pinned by
-`REALSENSE_ROS_VERSION`) and the `librealsense` SDK (pinned by
-`LIBREALSENSE_VERSION`):
+The USB3 presets were enumerated via `rs-enumerate-devices` on a D455. The
+**USB2 presets are UNVERIFIED**: the camera was on a USB3 link, so the USB2
+whitelist was not enumerated -- 720p depth may exceed USB2 bandwidth or not be
+offered. Verify each on a real USB2 link (a D435/D455 on a USB 2 link cannot
+sustain the stock 640x480x30 color + depth and delivers **0 frames** at 30 fps).
+
+#### `yaml/official/`, `json/official/`, `udev/` -- vendored upstream (do not hand-edit)
+
+The vendored files are copied **verbatim** from upstream at a pinned tag, so they
+can serve as a drift-check baseline. Two upstreams feed them -- the
+`realsense-ros` wrapper (pinned by `REALSENSE_ROS_VERSION`) and the
+`librealsense` SDK (pinned by `LIBREALSENSE_VERSION`):
 
 | File | Upstream source @ pinned tag | Drift check |
 |------|------------------------------|-------------|
-| `config.yaml` | realsense-ros `realsense2_camera/examples/launch_params_from_file/config/config.yaml` | `check_configs_sync.sh` |
-| `global_settings.yaml` | realsense-ros `realsense2_camera/CMakeLists.txt` (default `USE_LIFECYCLE_NODE=OFF` -> `use_lifecycle_node: false`) | `check_configs_sync.sh` |
-| `d500_tables/*.json` | realsense-ros `realsense2_camera/examples/d500_tables/*.json` | (none) |
-| `99-realsense-libusb.rules` | librealsense `config/99-realsense-libusb.rules` | `check_udev_rules_sync.sh` |
+| `yaml/official/config.yaml` | realsense-ros `realsense2_camera/examples/launch_params_from_file/config/config.yaml` | `check_configs_sync.sh` |
+| `yaml/official/global_settings.yaml` | realsense-ros `realsense2_camera/CMakeLists.txt` (default `USE_LIFECYCLE_NODE=OFF` -> `use_lifecycle_node: false`) | `check_configs_sync.sh` |
+| `json/official/d500_tables/*.json` | realsense-ros `realsense2_camera/examples/d500_tables/*.json` | (none) |
+| `udev/99-realsense-libusb.rules` | librealsense `config/99-realsense-libusb.rules` | `check_udev_rules_sync.sh` |
 
 `.github/workflows/upstream-bump.yaml` runs both drift checks on a schedule and
 warns when a vendored copy diverges from its pinned upstream. Re-vendor on an
@@ -408,7 +427,7 @@ realsense_ros2/
 ├── Dockerfile                   # Multi-stage build
 ├── LICENSE
 ├── README.md
-├── camera.yaml -> config/realsense/custom/none.yaml # symlink (active camera config; default = stock)
+├── camera.yaml -> config/realsense/yaml/custom/none.yaml # symlink (active camera config; default = stock)
 ├── justfile -> .base/script/docker/justfile        # symlink (user entry point)
 ├── .hadolint.yaml -> .base/.hadolint.yaml          # symlink
 ├── .base/                       # base subtree (read-only; v0.41.0)
@@ -433,15 +452,25 @@ realsense_ros2/
 ├── config/
 │   ├── docker/
 │   │   └── setup.conf           # configuration surface (.env/compose.yaml generated from this)
-│   └── realsense/
-│       ├── official/                  # vendored verbatim from upstream (drift-checked)
-│       │   ├── 99-realsense-libusb.rules  # RealSense udev rules (vendored from librealsense SDK)
-│       │   ├── config.yaml            # vendored example config (realsense-ros)
-│       │   ├── global_settings.yaml   # vendored example config (realsense-ros)
-│       │   └── d500_tables/           # vendored D500 example JSON tables (realsense-ros)
-│       └── custom/                    # OUR profiles (kept separate from vendored)
-│           ├── none.yaml              # empty = stock/default (camera.yaml default target)
-│           └── usb2.yaml              # USB2-friendly profile (640x480@15 + 480x270@15, aligned)
+│   └── realsense/                     # type-first: yaml/ + json/ + udev/
+│       ├── yaml/
+│       │   ├── official/              # vendored verbatim (drift-checked)
+│       │   │   ├── config.yaml            # vendored example config (realsense-ros)
+│       │   │   └── global_settings.yaml   # vendored example config (realsense-ros)
+│       │   └── custom/                # OUR profiles (none + named presets)
+│       │       ├── none.yaml              # empty = stock/default (camera.yaml default target)
+│       │       ├── usb3_1280x720p30fps.yaml  # USB3: color 1280x720x30, depth 1280x720x30
+│       │       ├── usb3_848x480p60fps.yaml   # USB3: color 848x480x60, depth 1280x720x30
+│       │       ├── usb3_640x480p60fps.yaml   # USB3: color 640x480x60, depth 1280x720x30
+│       │       ├── usb3_424x240p90fps.yaml   # USB3: color 424x240x90, depth 1280x720x30
+│       │       ├── usb2_1280x720p6fps.yaml   # USB2 (UNVERIFIED): color 1280x720x6, depth 1280x720x6
+│       │       ├── usb2_640x480p15fps.yaml   # USB2 (UNVERIFIED): color 640x480x15, depth 1280x720x15
+│       │       └── usb2_424x240p30fps.yaml   # USB2 (UNVERIFIED): color 424x240x30, depth 1280x720x30
+│       ├── json/
+│       │   └── official/
+│       │       └── d500_tables/       # vendored D500 example JSON tables (realsense-ros)
+│       └── udev/
+│           └── 99-realsense-libusb.rules  # RealSense udev rules (vendored from librealsense SDK)
 ├── doc/
 │   ├── README.zh-TW.md          # Traditional Chinese
 │   ├── README.zh-CN.md          # Simplified Chinese
