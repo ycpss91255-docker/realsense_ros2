@@ -5,6 +5,21 @@ versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Changed
+- Flattened the `config/realsense/` audience sub-level: camera profiles moved
+  from `config/realsense/yaml/custom/*.yaml` to `config/realsense/yaml/*.yaml`,
+  and the D500 example tables from `config/realsense/json/official/d500_tables/`
+  to `config/realsense/json/d500_tables/`. The `camera.yaml` symlink, Dockerfile
+  `CAMERA_CONFIG` prose, scripts, and READMEs (4 languages) follow the new
+  paths. Refs #123 / base#827.
+- Moved the vendored realsense-ros **drift baseline** out of `config/`:
+  `config/realsense/yaml/official/{config.yaml,global_settings.yaml}` ->
+  `.github/upstream-baseline/{config.yaml,global_settings.yaml}`. These are a CI
+  drift fixture (checked by `script/check_configs_sync.sh` and annotated by
+  `.github/workflows/upstream-bump.yaml`), not user config, and are not baked
+  into the image. Interim best-guess layout pending base#827. Refs #123 /
+  base#827.
+
 ### Added
 - Optional **camera config** selected by the root `camera.yaml` symlink
   (modeled on `app/ros1_bridge`'s `bridge.yaml`). The Dockerfile
@@ -14,11 +29,11 @@ versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   `ros2 launch realsense2_camera rs_launch.py config_file:=/camera_config.yaml
   initial_reset:=true` when that file is non-empty, otherwise runs the stock
   default `CMD` unchanged. The default target
-  `config/realsense/yaml/custom/none.yaml` is an empty file, so the out-of-the-box
+  `config/realsense/yaml/none.yaml` is an empty file, so the out-of-the-box
   behavior is exactly the stock upstream default (640x480x30, aligned).
   Activate a profile by repointing the symlink or passing
-  `--build-arg CAMERA_CONFIG=config/realsense/yaml/custom/usb2_640x480p15fps.yaml`.
-- **Camera profile presets** under `config/realsense/yaml/custom/` (one file per
+  `--build-arg CAMERA_CONFIG=config/realsense/yaml/usb2_640x480p15fps.yaml`.
+- **Camera profile presets** under `config/realsense/yaml/` (one file per
   resolution at that link's max fps; depth always 1280x720, capped at 30 fps;
   infra/IMU off; aligned depth on): four USB3 presets enumerated on a D455
   (`usb3_1280x720p30fps`, `usb3_848x480p60fps`, `usb3_640x480p60fps`,
@@ -26,12 +41,12 @@ versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   (`usb2_1280x720p6fps`, `usb2_640x480p15fps`, `usb2_424x240p30fps`; the USB2
   whitelist was not enumerated -- verify 720p depth on a real USB2 link), plus
   `none.yaml` (empty stock marker). Refs #121.
-- Vendored upstream files under `config/realsense/yaml/official/`,
-  `config/realsense/json/official/`, and `config/realsense/udev/`
+- Vendored upstream files under `.github/upstream-baseline/`,
+  `config/realsense/json/d500_tables/`, and `config/realsense/udev/`
   (`config.yaml`, `global_settings.yaml`, `d500_tables/*.json` from
   realsense-ros, and the `99-realsense-libusb.rules` udev rules vendored from
   the librealsense SDK), kept separate from our
-  `config/realsense/yaml/custom/` profiles; provenance and the custom-vs-official
+  `config/realsense/yaml/` profiles; provenance and the vendored-vs-custom
   split are documented in the repo README (Camera Config section, with i18n),
   and `script/check_configs_sync.sh` + a `check-configs` job in
   `.github/workflows/upstream-bump.yaml` that diffs them against upstream at

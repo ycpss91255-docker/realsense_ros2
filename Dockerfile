@@ -298,10 +298,10 @@ RUN prefix="/opt/ros/${ROS_DISTRO}" && \
 
 # Optional camera config, modeled on app/ros1_bridge's BRIDGE_FILE. CAMERA_CONFIG
 # points at the root `camera.yaml` symlink, whose default target is the EMPTY
-# config/realsense/yaml/custom/none.yaml, so /camera_config.yaml is 0 bytes and the
+# config/realsense/yaml/none.yaml, so /camera_config.yaml is 0 bytes and the
 # entrypoint runs the stock upstream default. Docker COPY follows the symlink and
 # copies the TARGET's content, so repointing the symlink (or passing
-# --build-arg CAMERA_CONFIG=config/realsense/yaml/custom/usb2_640x480p15fps.yaml) selects a profile.
+# --build-arg CAMERA_CONFIG=config/realsense/yaml/usb2_640x480p15fps.yaml) selects a profile.
 ARG CAMERA_CONFIG="camera.yaml"
 
 COPY --chmod=0755 "./${ENTRYPOINT_FILE}" "/entrypoint.sh"

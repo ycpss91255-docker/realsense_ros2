@@ -301,7 +301,7 @@ and reloads udev. Re-plug the camera afterwards. The container itself runs in
 
 The active camera profile is selected by the root `camera.yaml` **symlink**
 (modeled on `app/ros1_bridge`'s `bridge.yaml`). Its default target is
-`config/realsense/yaml/custom/none.yaml`, an **empty** file, so the runtime image
+`config/realsense/yaml/none.yaml`, an **empty** file, so the runtime image
 launches the stock upstream default (640x480x30, aligned depth) exactly as
 before. The Dockerfile COPYs the symlink target to `/camera_config.yaml`; when
 that file is non-empty the entrypoint launches
@@ -311,30 +311,31 @@ initial_reset:=true`, otherwise it runs the default `CMD`.
 Activate a profile either by repointing the symlink:
 
 ```bash
-ln -sf config/realsense/yaml/custom/usb2_640x480p15fps.yaml camera.yaml
+ln -sf config/realsense/yaml/usb2_640x480p15fps.yaml camera.yaml
 ./script/build.sh
 ```
 
 or per build without touching the symlink:
 
 ```bash
-./script/build.sh --build-arg CAMERA_CONFIG=config/realsense/yaml/custom/usb2_640x480p15fps.yaml
+./script/build.sh --build-arg CAMERA_CONFIG=config/realsense/yaml/usb2_640x480p15fps.yaml
 ```
 
-`config/realsense/` is organized **type-first**, separating **our** profiles
-from the **vendored upstream** configs:
+`config/realsense/` is organized **type-first**:
 
 ```text
 config/realsense/
-├── yaml/
-│   ├── official/   # vendored realsense-ros example configs (drift-checked)
-│   └── custom/     # OUR camera profiles (none + named presets)
+├── yaml/            # OUR camera profiles (none + named presets)
 ├── json/
-│   └── official/   # vendored realsense-ros D500 example JSON tables
-└── udev/           # vendored librealsense udev rules
+│   └── d500_tables/ # vendored realsense-ros D500 example JSON tables
+└── udev/            # vendored librealsense udev rules
 ```
 
-#### `yaml/custom/` -- our profiles
+The vendored realsense-ros drift baseline (`config.yaml`, `global_settings.yaml`)
+lives in `.github/upstream-baseline/` -- it is a CI drift fixture, not user
+config, and is not baked into the image.
+
+#### `yaml/` -- our profiles
 
 One preset per resolution, at that resolution's max fps for the link. **Depth is
 always 1280x720** (the camera's highest depth resolution), capped at 30 fps.
@@ -359,7 +360,7 @@ whitelist was not enumerated -- 720p depth may exceed USB2 bandwidth or not be
 offered. Verify each on a real USB2 link (a D435/D455 on a USB 2 link cannot
 sustain the stock 640x480x30 color + depth and delivers **0 frames** at 30 fps).
 
-#### `yaml/official/`, `json/official/`, `udev/` -- vendored upstream (do not hand-edit)
+#### `.github/upstream-baseline/`, `json/d500_tables/`, `udev/` -- vendored upstream (do not hand-edit)
 
 The vendored files are copied **verbatim** from upstream at a pinned tag, so they
 can serve as a drift-check baseline. Two upstreams feed them -- the
@@ -368,9 +369,9 @@ can serve as a drift-check baseline. Two upstreams feed them -- the
 
 | File | Upstream source @ pinned tag | Drift check |
 |------|------------------------------|-------------|
-| `yaml/official/config.yaml` | realsense-ros `realsense2_camera/examples/launch_params_from_file/config/config.yaml` | `check_configs_sync.sh` |
-| `yaml/official/global_settings.yaml` | realsense-ros `realsense2_camera/CMakeLists.txt` (default `USE_LIFECYCLE_NODE=OFF` -> `use_lifecycle_node: false`) | `check_configs_sync.sh` |
-| `json/official/d500_tables/*.json` | realsense-ros `realsense2_camera/examples/d500_tables/*.json` | (none) |
+| `.github/upstream-baseline/config.yaml` | realsense-ros `realsense2_camera/examples/launch_params_from_file/config/config.yaml` | `check_configs_sync.sh` |
+| `.github/upstream-baseline/global_settings.yaml` | realsense-ros `realsense2_camera/CMakeLists.txt` (default `USE_LIFECYCLE_NODE=OFF` -> `use_lifecycle_node: false`) | `check_configs_sync.sh` |
+| `json/d500_tables/*.json` | realsense-ros `realsense2_camera/examples/d500_tables/*.json` | (none) |
 | `udev/99-realsense-libusb.rules` | librealsense `config/99-realsense-libusb.rules` | `check_udev_rules_sync.sh` |
 
 `.github/workflows/upstream-bump.yaml` runs both drift checks on a schedule and
@@ -427,7 +428,7 @@ realsense_ros2/
 ├── Dockerfile                   # Multi-stage build
 ├── LICENSE
 ├── README.md
-├── camera.yaml -> config/realsense/yaml/custom/none.yaml # symlink (active camera config; default = stock)
+├── camera.yaml -> config/realsense/yaml/none.yaml # symlink (active camera config; default = stock)
 ├── justfile -> .base/script/docker/justfile        # symlink (user entry point)
 ├── .hadolint.yaml -> .base/.hadolint.yaml          # symlink
 ├── .base/                       # base subtree (read-only; v0.41.0)
@@ -453,22 +454,17 @@ realsense_ros2/
 │   ├── docker/
 │   │   └── setup.conf           # configuration surface (.env/compose.yaml generated from this)
 │   └── realsense/                     # type-first: yaml/ + json/ + udev/
-│       ├── yaml/
-│       │   ├── official/              # vendored verbatim (drift-checked)
-│       │   │   ├── config.yaml            # vendored example config (realsense-ros)
-│       │   │   └── global_settings.yaml   # vendored example config (realsense-ros)
-│       │   └── custom/                # OUR profiles (none + named presets)
-│       │       ├── none.yaml              # empty = stock/default (camera.yaml default target)
-│       │       ├── usb3_1280x720p30fps.yaml  # USB3: color 1280x720x30, depth 1280x720x30
-│       │       ├── usb3_848x480p60fps.yaml   # USB3: color 848x480x60, depth 1280x720x30
-│       │       ├── usb3_640x480p60fps.yaml   # USB3: color 640x480x60, depth 1280x720x30
-│       │       ├── usb3_424x240p90fps.yaml   # USB3: color 424x240x90, depth 1280x720x30
-│       │       ├── usb2_1280x720p6fps.yaml   # USB2 (UNVERIFIED): color 1280x720x6, depth 1280x720x6
-│       │       ├── usb2_640x480p15fps.yaml   # USB2 (UNVERIFIED): color 640x480x15, depth 1280x720x15
-│       │       └── usb2_424x240p30fps.yaml   # USB2 (UNVERIFIED): color 424x240x30, depth 1280x720x30
+│       ├── yaml/                      # OUR profiles (none + named presets)
+│       │   ├── none.yaml                 # empty = stock/default (camera.yaml default target)
+│       │   ├── usb3_1280x720p30fps.yaml  # USB3: color 1280x720x30, depth 1280x720x30
+│       │   ├── usb3_848x480p60fps.yaml   # USB3: color 848x480x60, depth 1280x720x30
+│       │   ├── usb3_640x480p60fps.yaml   # USB3: color 640x480x60, depth 1280x720x30
+│       │   ├── usb3_424x240p90fps.yaml   # USB3: color 424x240x90, depth 1280x720x30
+│       │   ├── usb2_1280x720p6fps.yaml   # USB2 (UNVERIFIED): color 1280x720x6, depth 1280x720x6
+│       │   ├── usb2_640x480p15fps.yaml   # USB2 (UNVERIFIED): color 640x480x15, depth 1280x720x15
+│       │   └── usb2_424x240p30fps.yaml   # USB2 (UNVERIFIED): color 424x240x30, depth 1280x720x30
 │       ├── json/
-│       │   └── official/
-│       │       └── d500_tables/       # vendored D500 example JSON tables (realsense-ros)
+│       │   └── d500_tables/          # vendored D500 example JSON tables (realsense-ros)
 │       └── udev/
 │           └── 99-realsense-libusb.rules  # RealSense udev rules (vendored from librealsense SDK)
 ├── doc/
@@ -481,10 +477,12 @@ realsense_ros2/
 │   ├── changelog/CHANGELOG.md
 │   └── test/
 │       └── TEST.md             # automatic build-time smoke tests
-├── .github/workflows/
-│   ├── main.yaml                # CI (calls base reusable build/release workers)
-│   ├── build-librealsense.yaml  # Publish the prebuilt librealsense SDK image (per Ubuntu platform: jammy/noble) to GHCR
-│   └── upstream-bump.yaml       # Scheduled: open a bump PR on a new upstream release
+├── .github/
+│   ├── upstream-baseline/       # vendored realsense-ros drift baseline (config.yaml + global_settings.yaml; CI fixture, not baked)
+│   └── workflows/
+│       ├── main.yaml                # CI (calls base reusable build/release workers)
+│       ├── build-librealsense.yaml  # Publish the prebuilt librealsense SDK image (per Ubuntu platform: jammy/noble) to GHCR
+│       └── upstream-bump.yaml       # Scheduled: open a bump PR on a new upstream release
 └── test/
     └── smoke/                   # repo-owned bats tests
         └── ros_env.bats         # (helper + more .bats come from .base/test/smoke/)

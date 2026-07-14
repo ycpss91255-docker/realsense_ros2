@@ -5,7 +5,7 @@ set -euo pipefail
 #
 # Optional camera config (modeled on ros1_bridge's /bridge.yaml). The Dockerfile
 # COPYs the root `camera.yaml` symlink's target to /camera_config.yaml; the
-# default target is config/realsense/yaml/custom/none.yaml, an EMPTY file, so the
+# default target is config/realsense/yaml/none.yaml, an EMPTY file, so the
 # stock upstream default runs unchanged. When a non-empty profile is active
 # (repoint the symlink or pass --build-arg CAMERA_CONFIG=...), launch the camera
 # with it via rs_launch.py's config_file arg.
