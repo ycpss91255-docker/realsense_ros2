@@ -19,15 +19,19 @@ ARG LIBREALSENSE_VERSION="v2.58.2"
 # (Dockerfile.example); see the sibling app/ros1_bridge for the same setup.
 ARG TEST_TOOLS_IMAGE="test-tools:local"
 # Prebuilt librealsense SDK source image, mirroring TEST_TOOLS_IMAGE's
-# dual-source pattern. Resolves to `librealsense:local` for the local
-# `just build` / `./build.sh` flow (the pre-build hook
-# script/hooks/pre/build.sh auto-builds it from docker/librealsense/Dockerfile
-# when LIBREALSENSE_IMAGE is unset -> self-contained, no GHCR needed), or to
-# the multi-arch ghcr.io/ycpss91255-docker/librealsense:${LIBREALSENSE_VERSION}-${UBUNTU_CODENAME}
+# dual-source pattern. Resolves to the version-scoped local tag
+# `librealsense:${LIBREALSENSE_VERSION}-${UBUNTU_CODENAME}` for the local
+# `just build` / `./build.sh` flow (the pre-build hook script/hooks/pre/build.sh
+# auto-builds that tag from docker/Dockerfile.librealsense when LIBREALSENSE_IMAGE
+# is unset -> self-contained, no GHCR needed), or to the multi-arch
+# ghcr.io/ycpss91255-docker/librealsense:${LIBREALSENSE_VERSION}-${UBUNTU_CODENAME}
 # in CI (main.yaml passes it as a build-arg so buildx PULLS the prebuilt SDK
-# instead of recompiling librealsense ~15-25 min per run). Both the GHCR export
-# image and the local image expose the two trees at /rs-full and /rs-stage.
-ARG LIBREALSENSE_IMAGE="librealsense:local"
+# instead of recompiling librealsense ~15-25 min per run). The version+codename
+# scope stops ros1 (v2.55.1) and ros2 (v2.58.2) clobbering one shared local tag;
+# a wrong/missing version then fails the FROM loudly instead of reusing a stale
+# SDK. Both the GHCR export image and the local image expose the two trees at
+# /rs-full and /rs-stage.
+ARG LIBREALSENSE_IMAGE="librealsense:${LIBREALSENSE_VERSION}-${UBUNTU_CODENAME}"
 
 ############################## rs_sdk ##############################
 # Prebuilt librealsense SDK (issue #97 / option B). Compiled ONCE per distro by
@@ -38,7 +42,8 @@ ARG LIBREALSENSE_IMAGE="librealsense:local"
 # + gl) and /rs-stage (tools-pruned, for the runtime overlay). Multi-arch, so
 # the tag resolves the matching variant per build platform. The source is
 # parameterized via LIBREALSENSE_IMAGE (see the ARG above): a local build FROMs
-# librealsense:local, CI FROMs the GHCR tag.
+# the version-scoped librealsense:${LIBREALSENSE_VERSION}-${UBUNTU_CODENAME}, CI
+# FROMs the GHCR tag.
 # hadolint ignore=DL3006
 FROM ${LIBREALSENSE_IMAGE} AS rs_sdk
 
@@ -355,6 +360,10 @@ COPY Dockerfile /lint/Dockerfile
 # this stage. The repo's own script/*.sh are symlinks to those wrappers, so
 # `COPY script/*.sh /lint/` already dereferences and lints them.
 COPY script/*.sh /lint/
+# `COPY script/*.sh` is non-recursive, so script/hooks/pre/build.sh is not
+# shellchecked by it; a dedicated COPY brings the pre-build hook into the
+# /lint/*.sh glob (and lets dockerfile_guards.bats grep it).
+COPY script/hooks/pre/build.sh /lint/hooks-pre-build.sh
 COPY .base/script/docker/lib /lint/lib
 RUN shellcheck -S warning /lint/*.sh /lint/lib/*.sh
 WORKDIR /lint

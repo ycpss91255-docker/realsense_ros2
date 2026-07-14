@@ -1,6 +1,6 @@
 # TEST.md
 
-**99 tests** total.
+**101 tests** total.
 
 ## test/smoke/ros_env.bats
 
@@ -111,7 +111,7 @@
 
 ## test/smoke/dockerfile_guards.bats
 
-### Dockerfile static guards (6)
+### Dockerfile static guards (8)
 
 | Test | Description |
 |------|-------------|
@@ -121,6 +121,8 @@
 | `version ARGs are pinned, not floating (#97)` | `LIBREALSENSE_VERSION=v2.58.2` / `REALSENSE_ROS_VERSION=4.58.2` pinned, not `latest` |
 | `runtime-test smoke asserts the ament marker (#97)` | runtime smoke runs `ros2 pkg prefix realsense2_camera` to catch a missed marker |
 | `runtime rosdep skips the self-built SDK and resolves exec deps only (#97)` | runtime rosdep uses `--dependency-types=exec --skip-keys=librealsense2` |
+| `local librealsense SDK tag is version-scoped (Dockerfile default + hook agree)` | Dockerfile `LIBREALSENSE_IMAGE` default and hook `-t` both derive `librealsense:${LIBREALSENSE_VERSION}-${UBUNTU_CODENAME}` |
+| `the bare librealsense:local tag is gone (a wrong version fails the build, not runs silently)` | No bare `librealsense:local` in the Dockerfile ARG default or the hook `-t` (a missing version fails the FROM) |
 
 ## test/smoke/camera_config.bats
 

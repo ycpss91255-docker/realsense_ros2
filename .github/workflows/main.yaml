@@ -43,7 +43,8 @@ jobs:
       # matrix/github/needs/inputs/vars are), so it cannot be factored into a
       # workflow-level env var -- keep it in sync with the LIBREALSENSE_VERSION
       # ARG in the main Dockerfile and build-librealsense.yaml. Local builds omit
-      # this arg -> the Dockerfile default `librealsense:local` (built by
+      # this arg -> the version-scoped Dockerfile default
+      # `librealsense:${LIBREALSENSE_VERSION}-${UBUNTU_CODENAME}` (built by
       # script/hooks/pre/build.sh).
       build_args: |
         ROS_DISTRO=${{ matrix.target.ros_distro }}

@@ -5,6 +5,17 @@ versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Fixed
+- Version-scoped the local librealsense SDK image tag (refs #125, base#828): the
+  pre-build hook and the Dockerfile `LIBREALSENSE_IMAGE` default used a bare
+  `librealsense:local`, which ros1 (v2.55.1) and ros2 (v2.58.2) share -- building
+  one repo clobbered the other's local SDK image and a later build silently FROMed
+  the wrong-version SDK. Both now derive `librealsense:${LIBREALSENSE_VERSION}-${UBUNTU_CODENAME}`,
+  so the tags never collide and a wrong/missing version fails the `FROM` loudly.
+  The pre-build hook is now also COPYed into `/lint` so ShellCheck covers it (it
+  previously escaped the non-recursive `script/*.sh` glob). Added two
+  `dockerfile_guards.bats` regressions.
+
 ### Changed
 - Flattened the `config/realsense/` audience sub-level: camera profiles moved
   from `config/realsense/yaml/custom/*.yaml` to `config/realsense/yaml/*.yaml`,
