@@ -17,6 +17,29 @@ versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   `dockerfile_guards.bats` regressions.
 
 ### Changed
+- **Single-sourced the librealsense SDK version** on the main Dockerfile
+  `ARG LIBREALSENSE_VERSION` (refs #128, base#829). The pre-build hook
+  `script/hooks/pre/build.sh` now READS the pin (and `UBUNTU_CODENAME`) from the
+  Dockerfile ARGs instead of mirroring hardcoded literals, and
+  `docker/Dockerfile.librealsense`'s own ARG is documented as a fallback (the
+  real value arrives via the hook's / CI's `--build-arg`). A bump that seds only
+  the main Dockerfile ARG now propagates everywhere -- no more 3-way drift.
+- **`script/bump_realsense_versions.sh` now pairs the versions off upstream's
+  own declaration.** realsense-ros is the driver: the script reads the latest
+  realsense-ros release, parses the librealsense minor it declares via
+  `find_package(realsense2 X.Y.Z)` in `realsense2_camera/CMakeLists.txt`, and
+  pins librealsense to the newest release tag in THAT minor (floored at the
+  declared version) -- never a librealsense+realsense-ros combo upstream did not
+  test. It prepends a `[Unreleased]` > `### Changed` CHANGELOG bullet on a
+  successful bump and emits `abi_safe=true|false` keyed on realsense-ros: a
+  realsense-ros patch (declared minor unchanged) is a safe drop-in, a
+  minor/major change pulls librealsense into a new minor and needs review.
+  `.github/workflows/upstream-bump.yaml` gates on it -- a safe bump PR gets
+  `gh pr merge --auto --squash` (CI green on humble+jazzy x amd64+arm64 merges
+  it with no human), a minor/major bump opens the PR without auto-merge. The
+  D455-on-Pi5 hardware check is not machine-enforced and is deferred to #82.
+  Deferred: setup.conf as the injected single-source and auto-release/auto-tag
+  on merge (base#829). Refs #128 / #127.
 - Flattened the `config/realsense/` audience sub-level: camera profiles moved
   from `config/realsense/yaml/custom/*.yaml` to `config/realsense/yaml/*.yaml`,
   and the D500 example tables from `config/realsense/json/official/d500_tables/`

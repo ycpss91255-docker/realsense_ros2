@@ -7,6 +7,8 @@
 # glibc/libstdc++ (jammy != noble); it installs into the ROS-agnostic /usr/local
 # prefix, and build-librealsense.yaml drives every codename x arch. Produces two
 # DESTDIR trees the consumer COPYs from -- a build-time source, never shipped.
+# Fallback defaults only: the real values arrive via the pre-build hook's / CI's
+# --build-arg (derived from the main Dockerfile's ARGs, the single source).
 ARG UBUNTU_CODENAME=jammy
 ARG LIBREALSENSE_VERSION=v2.58.2
 

@@ -31,10 +31,15 @@ jobs:
           set -e
           echo "${out}"
           if [ "${code}" -eq 0 ]; then
+            # bump script emits a trailing abi_safe=<bool> line; split it out of
+            # the human-facing summary and surface it as its own step output.
+            abi_safe="$(printf '%s\n' "${out}" | sed -n 's/^abi_safe=//p')"
+            summary="$(printf '%s\n' "${out}" | grep -v '^abi_safe=')"
             {
               echo "changed=true"
+              echo "abi_safe=${abi_safe}"
               echo "summary<<EOF"
-              echo "${out}"
+              echo "${summary}"
               echo "EOF"
             } >> "${GITHUB_OUTPUT}"
           elif [ "${code}" -eq 10 ]; then
@@ -48,25 +53,48 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           SUMMARY: ${{ steps.bump.outputs.summary }}
+          ABI_SAFE: ${{ steps.bump.outputs.abi_safe }}
         run: |
           branch="bump/realsense-$(date +%Y%m%d)"
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git checkout -b "${branch}"
-          git add Dockerfile
+          git add Dockerfile doc/changelog/CHANGELOG.md
           git commit -m "chore(deps): bump pinned RealSense source versions"
           git push -u origin "${branch}"
+
+          # realsense-ros PATCH (same declared realsense2 minor) -> let CI merge
+          # it; a realsense-ros minor/major change pulls librealsense into a new
+          # minor, so leave it for human review.
+          if [ "${ABI_SAFE}" = "true" ]; then
+            merge_note="realsense-ros patch (declared realsense2 minor unchanged): auto-merge is enabled -- CI green on the full matrix merges this with no human."
+          else
+            merge_note="realsense-ros minor/major change (declared realsense2 minor changed; librealsense follows into a new minor): auto-merge is NOT enabled -- left for human review."
+          fi
+
           gh pr create \
             --title "chore(deps): bump pinned RealSense source versions" \
             --body "Automated bump of the pinned RealSense source tags (#97).
+          realsense-ros drives the pair: librealsense is pinned to the minor
+          realsense-ros declares via find_package(realsense2 X.Y.Z), so the combo
+          is one upstream tested.
 
           ${SUMMARY}
 
-          The SDK SONAME is librealsense2.so.2.58, so a same-minor bump is a
-          drop-in. Merge gate: CI green on the full matrix
-          (humble+jazzy x amd64+arm64) AND a manual D455-on-Pi5 aligned-depth
-          run, per issue #97. If the udev-rules sync check reports drift,
+          ${merge_note}
+
+          Merge gate today: CI green on the full matrix
+          (humble+jazzy x amd64+arm64). The D455-on-Pi5 aligned-depth hardware
+          check is NOT machine-enforced -- auto-merge bypasses it -- and is
+          deferred to the self-hosted hardware CI in #82. Risk: an ABI/behavioral
+          regression that only surfaces on real hardware can reach main via
+          auto-merge; until #82 exists a same-minor realsense-ros bump is treated
+          as low-risk on that basis. If the udev-rules sync check reports drift,
           re-vendor config/realsense/udev/99-realsense-libusb.rules before merge."
+
+          if [ "${ABI_SAFE}" = "true" ]; then
+            gh pr merge --auto --squash "${branch}"
+          fi
 
   check-udev-rules:
     runs-on: ubuntu-latest

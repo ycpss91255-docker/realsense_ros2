@@ -1,6 +1,6 @@
 # TEST.md
 
-**101 tests** total.
+**109 tests** total.
 
 ## test/smoke/ros_env.bats
 
@@ -98,7 +98,7 @@
 
 ## test/smoke/bump_realsense_versions.bats
 
-### bump_realsense_versions.sh (6)
+### bump_realsense_versions.sh (14)
 
 | Test | Description |
 |------|-------------|
@@ -108,6 +108,14 @@
 | `bump_realsense_versions.sh is executable` | Script carries the executable bit |
 | `current_arg returns the pinned value from the Dockerfile ARG` | Parser reads a pinned ARG value from a fixture Dockerfile |
 | `set_arg rewrites only the target ARG line (round-trip; others untouched)` | Rewriter updates the target ARG and leaves other ARG lines unchanged |
+| `required_librealsense_minor parses find_package(realsense2 2.58.0) -> 2.58` | Reads the librealsense minor realsense-ros declares from CMakeLists text |
+| `required_librealsense_version parses the declared floor 2.58.0` | Reads the full declared librealsense version (the pin floor) |
+| `latest_tag_in_minor picks the highest v2.58.z (ignores other minors)` | Selects the newest librealsense tag within the required minor from a fixture list |
+| `same_minor_bump: a realsense-ros patch (same minor) is safe (exit 0)` | Same realsense-ros major.minor (4.58.x -> 4.58.y) classifies safe/auto |
+| `same_minor_bump: a realsense-ros minor change is not safe (exit 1)` | A realsense-ros minor bump (4.58 -> 4.59) classifies review |
+| `same_minor_bump: a realsense-ros major change is not safe (exit 1)` | A realsense-ros major bump (4.x -> 5.x) classifies review |
+| `prepend_changelog_entry inserts under the existing ### Changed subheading` | Bump helper prepends the bullet under `[Unreleased]` > `### Changed` |
+| `prepend_changelog_entry creates ### Changed when the Unreleased section lacks one` | Bump helper creates the `### Changed` subheading when absent |
 
 ## test/smoke/dockerfile_guards.bats
 
