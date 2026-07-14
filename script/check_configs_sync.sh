@@ -3,7 +3,7 @@
 # Check the vendored RealSense example configs against upstream at the pinned
 # realsense-ros tag.
 #
-# config/realsense/yaml/official/config.yaml and config/realsense/yaml/official/global_settings.yaml are
+# .github/upstream-baseline/config.yaml and .github/upstream-baseline/global_settings.yaml are
 # vendored verbatim from IntelRealSense/realsense-ros at the tag in the
 # Dockerfile ARG REALSENSE_ROS_VERSION. This script parses that tag, fetches the
 # upstream sources at that tag, and diffs them against the committed copies.
@@ -23,8 +23,8 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 readonly SCRIPT_DIR
 readonly REPO_ROOT="${SCRIPT_DIR}/.."
 readonly DOCKERFILE="${REPO_ROOT}/Dockerfile"
-readonly CONFIG_LOCAL="${REPO_ROOT}/config/realsense/yaml/official/config.yaml"
-readonly GLOBAL_LOCAL="${REPO_ROOT}/config/realsense/yaml/official/global_settings.yaml"
+readonly CONFIG_LOCAL="${REPO_ROOT}/.github/upstream-baseline/config.yaml"
+readonly GLOBAL_LOCAL="${REPO_ROOT}/.github/upstream-baseline/global_settings.yaml"
 readonly CONFIG_UPSTREAM_PATH="realsense2_camera/examples/launch_params_from_file/config/config.yaml"
 readonly CMAKE_UPSTREAM_PATH="realsense2_camera/CMakeLists.txt"
 
@@ -32,8 +32,8 @@ usage() {
   cat >&2 <<'EOF'
 Usage: check_configs_sync.sh [-h|--help]
 
-Diff the vendored config/realsense/yaml/official/config.yaml and
-config/realsense/yaml/official/global_settings.yaml against the upstream
+Diff the vendored .github/upstream-baseline/config.yaml and
+.github/upstream-baseline/global_settings.yaml against the upstream
 IntelRealSense/realsense-ros sources at the tag pinned in the Dockerfile ARG
 REALSENSE_ROS_VERSION.
 

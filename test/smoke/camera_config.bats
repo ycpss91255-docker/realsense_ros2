@@ -5,7 +5,7 @@
 # The root `camera.yaml` symlink selects the active RealSense config; the
 # Dockerfile COPYs its target to /camera_config.yaml and the entrypoint launches
 # the camera with it only when that file is non-empty AND the command is
-# `ros2 launch`. The default symlink target is config/realsense/yaml/custom/none.yaml
+# `ros2 launch`. The default symlink target is config/realsense/yaml/none.yaml
 # (empty), so the stock upstream default runs. entrypoint.sh factors the gate
 # into the pure `_apply_camera_config`, which resolves the final argv into
 # CONFIGURED_ARGV without executing; the ROS source + exec are guarded to the
