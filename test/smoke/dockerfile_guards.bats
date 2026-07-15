@@ -44,13 +44,37 @@ setup() {
     refute_output --partial 'ros-${ROS_DISTRO}-realsense2-description'
 }
 
-@test "version ARGs are pinned, not floating (#97)" {
+@test "version pins are concrete, not floating (#97, #130)" {
     # #97: the source build must pin concrete upstream tags (reproducible,
     # no auto-shipping upstream regressions) -- never `latest`.
-    assert_file_exists "${DOCKERFILE}"
-    run grep -F 'ARG LIBREALSENSE_VERSION="v2.58.2"' "${DOCKERFILE}"
+    # #130: the librealsense pin's canonical home is setup.conf; assert it
+    # carries a concrete vX.Y.Z there. The Dockerfile ARG stays a concrete
+    # fallback (a bare `docker build` must still resolve a version), and
+    # REALSENSE_ROS_VERSION stays a concrete Dockerfile ARG.
+    assert_file_exists /lint/setup.conf
+    run grep -oP '^\s*arg_[0-9]+\s*=\s*LIBREALSENSE_VERSION=\K\S+' /lint/setup.conf
     assert_success
-    run grep -F 'ARG REALSENSE_ROS_VERSION="4.58.2"' "${DOCKERFILE}"
+    assert_output --regexp '^v[0-9]+\.[0-9]+\.[0-9]+$'
+
+    assert_file_exists "${DOCKERFILE}"
+    run grep -oP 'ARG LIBREALSENSE_VERSION="\K[^"]+' "${DOCKERFILE}"
+    assert_success
+    assert_output --regexp '^v[0-9]+\.[0-9]+\.[0-9]+$'
+    run grep -oP 'ARG REALSENSE_ROS_VERSION="\K[^"]+' "${DOCKERFILE}"
+    assert_success
+    assert_output --regexp '^[0-9]+\.[0-9]+\.[0-9]+$'
+}
+
+@test "main.yaml derives the librealsense version from setup.conf, no hardcoded literal (#130)" {
+    # #130 drift fix: CI must NOT hardcode a librealsense:v2.x literal (the bump
+    # script never rewrote main.yaml, so a bump left CI FROMing the stale GHCR
+    # image). It must instead reference the resolve step that parses setup.conf.
+    assert_file_exists /lint/main.yaml
+    run grep -E 'librealsense:v2\.[0-9]' /lint/main.yaml
+    assert_failure
+    run grep -F 'needs.resolve-librealsense.outputs.version' /lint/main.yaml
+    assert_success
+    run grep -F 'config/docker/setup.conf' /lint/main.yaml
     assert_success
 }
 

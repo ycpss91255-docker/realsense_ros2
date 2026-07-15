@@ -32,31 +32,60 @@ setup() {
     [ -x /lint/bump_realsense_versions.sh ]
 }
 
-@test "current_arg returns the pinned value from the Dockerfile ARG" {
+@test "current_arg returns the pinned REALSENSE_ROS_VERSION from the Dockerfile ARG" {
     run bash -c '
         f="$(mktemp)"
-        printf "ARG LIBREALSENSE_VERSION=\"v2.58.2\"\n" > "$f"
+        printf "ARG REALSENSE_ROS_VERSION=\"4.58.2\"\n" > "$f"
         DOCKERFILE="$f"
         source /lint/bump_realsense_versions.sh
-        current_arg LIBREALSENSE_VERSION
+        current_arg REALSENSE_ROS_VERSION
+        rm -f "$f"'
+    assert_success
+    assert_output "4.58.2"
+}
+
+@test "set_arg rewrites only the target Dockerfile ARG line (round-trip; others untouched)" {
+    run bash -c '
+        f="$(mktemp)"
+        printf "ARG REALSENSE_ROS_VERSION=\"4.58.2\"\nARG ROS_DISTRO=\"humble\"\n" > "$f"
+        DOCKERFILE="$f"
+        source /lint/bump_realsense_versions.sh
+        set_arg REALSENSE_ROS_VERSION 9.9.9
+        echo "ros=$(current_arg REALSENSE_ROS_VERSION)"
+        echo "distro=$(current_arg ROS_DISTRO)"
+        rm -f "$f"'
+    assert_success
+    assert_line "ros=9.9.9"
+    assert_line "distro=humble"
+}
+
+@test "conf_arg returns the LIBREALSENSE_VERSION pin from a setup.conf [build] arg_N line" {
+    # #130: the librealsense pin lives in setup.conf now; conf_arg reads it back
+    # regardless of the arg_ index and ignores the other arg_N build args.
+    run bash -c '
+        f="$(mktemp)"
+        printf "[build]\narg_1 = TZ=Asia/Taipei\narg_4 = LIBREALSENSE_VERSION=v2.58.2\n" > "$f"
+        SETUP_CONF="$f"
+        source /lint/bump_realsense_versions.sh
+        conf_arg LIBREALSENSE_VERSION
         rm -f "$f"'
     assert_success
     assert_output "v2.58.2"
 }
 
-@test "set_arg rewrites only the target ARG line (round-trip; others untouched)" {
+@test "set_conf_arg rewrites only the target setup.conf arg line (round-trip; others untouched)" {
     run bash -c '
         f="$(mktemp)"
-        printf "ARG LIBREALSENSE_VERSION=\"v2.58.2\"\nARG REALSENSE_ROS_VERSION=\"4.58.2\"\n" > "$f"
-        DOCKERFILE="$f"
+        printf "[build]\narg_1 = TZ=Asia/Taipei\narg_4 = LIBREALSENSE_VERSION=v2.58.2\n" > "$f"
+        SETUP_CONF="$f"
         source /lint/bump_realsense_versions.sh
-        set_arg LIBREALSENSE_VERSION v9.9.9
-        echo "lib=$(current_arg LIBREALSENSE_VERSION)"
-        echo "ros=$(current_arg REALSENSE_ROS_VERSION)"
+        set_conf_arg LIBREALSENSE_VERSION v9.9.9
+        echo "lib=$(conf_arg LIBREALSENSE_VERSION)"
+        grep -q "arg_1 = TZ=Asia/Taipei" "$f" && echo "tz=kept"
         rm -f "$f"'
     assert_success
     assert_line "lib=v9.9.9"
-    assert_line "ros=4.58.2"
+    assert_line "tz=kept"
 }
 
 @test "required_librealsense_minor parses find_package(realsense2 2.58.0) -> 2.58" {
