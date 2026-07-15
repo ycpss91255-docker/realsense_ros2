@@ -1,16 +1,19 @@
 #!/usr/bin/env bash
 #
-# Bump the pinned RealSense source versions in the Dockerfile.
+# Bump the pinned RealSense source versions.
 #
 # realsense-ros is the driver: query its latest release, read the librealsense
 # minor it declares (find_package(realsense2 X.Y.Z) in realsense2_camera/
 # CMakeLists.txt), and pin librealsense to the newest release tag in THAT minor.
 # This never pairs a librealsense+realsense-ros combo upstream did not test.
-# Rewrites the two ARG default lines in place, prints each old->new transition to
-# stdout, and emits a trailing abi_safe=<bool> line for the scheduled workflow.
-# Exit 0 when a change was made, 10 when already up to date. dependabot's docker
-# ecosystem cannot see ARG-embedded git tags, so this custom helper drives
-# .github/workflows/upstream-bump.yaml.
+# The librealsense pin lives in config/docker/setup.conf ([build] arg_N =
+# LIBREALSENSE_VERSION=...) -- the single source local build + CI both read -- so
+# this script rewrites THAT line via conf_arg / set_conf_arg. REALSENSE_ROS_VERSION
+# stays in the Dockerfile ARG (no multi-copy problem) via current_arg / set_arg.
+# Prints each old->new transition to stdout, and emits a trailing abi_safe=<bool>
+# line for the scheduled workflow. Exit 0 when a change was made, 10 when already
+# up to date. dependabot's docker ecosystem cannot see ARG-embedded git tags, so
+# this custom helper drives .github/workflows/upstream-bump.yaml.
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -19,6 +22,11 @@ readonly SCRIPT_DIR
 # Dockerfile; unset in real use, it resolves to the repo Dockerfile as before.
 DOCKERFILE="${DOCKERFILE:-${SCRIPT_DIR}/../Dockerfile}"
 readonly DOCKERFILE
+# Overridable so a sourcing test can point conf_arg / set_conf_arg at a fixture
+# setup.conf; unset in real use, it resolves to the repo setup.conf. This is the
+# canonical store for the librealsense pin.
+SETUP_CONF="${SETUP_CONF:-${SCRIPT_DIR}/../config/docker/setup.conf}"
+readonly SETUP_CONF
 # Overridable so a sourcing test can point prepend_changelog_entry at a fixture.
 CHANGELOG="${CHANGELOG:-${SCRIPT_DIR}/../doc/changelog/CHANGELOG.md}"
 readonly CHANGELOG
@@ -31,14 +39,16 @@ usage() {
   cat >&2 <<'EOF'
 Usage: bump_realsense_versions.sh [-h|--help]
 
-Bump the pinned RealSense source tags in the Dockerfile ARGs. realsense-ros is
-the driver: its latest release picks the target, and librealsense is pinned to
-the newest release in the minor realsense-ros declares (find_package(realsense2
-X.Y.Z)), so the pair is always one upstream tested. Prints each old->new
-transition and a trailing abi_safe=<bool> classification to stdout.
+Bump the pinned RealSense source tags. realsense-ros is the driver: its latest
+release picks the target, and librealsense is pinned to the newest release in
+the minor realsense-ros declares (find_package(realsense2 X.Y.Z)), so the pair
+is always one upstream tested. The librealsense pin is rewritten in
+config/docker/setup.conf (the canonical source); REALSENSE_ROS_VERSION in the
+Dockerfile ARG. Prints each old->new transition and a trailing abi_safe=<bool>
+classification to stdout.
 
 Requires the `gh` CLI authenticated (GH_TOKEN in CI). Exit codes:
-  0    Dockerfile was updated (at least one bump).
+  0    A pin was updated (at least one bump).
   10   Already up to date (no change).
   1    Error.
 
@@ -58,6 +68,21 @@ set_arg() {
   local arg_name="$1"
   local new_value="$2"
   sed -i -E "s|^(ARG ${arg_name}=\")[^\"]+(\")|\\1${new_value}\\2|" "${DOCKERFILE}"
+}
+
+# Reads a setup.conf [build] arg_N value by KEY: conf_arg <KEY>. Matches the
+# `arg_N = KEY=VALUE` line regardless of the arg_ index and returns VALUE.
+conf_arg() {
+  local key="$1"
+  grep -oP "^\\s*arg_[0-9]+\\s*=\\s*${key}=\\K\\S+" "${SETUP_CONF}" | head -1
+}
+
+# Rewrites a setup.conf [build] arg_N value by KEY in place: set_conf_arg <KEY>
+# <new_value>. Leaves the arg_ index and every other line untouched.
+set_conf_arg() {
+  local key="$1"
+  local new_value="$2"
+  sed -i -E "s|^(\\s*arg_[0-9]+\\s*=\\s*${key}=)\\S+|\\1${new_value}|" "${SETUP_CONF}"
 }
 
 # Fetches the latest release tag of a GitHub repo: latest_tag <owner/repo>.
@@ -173,11 +198,16 @@ main() {
       ;;
   esac
 
+  # librealsense pin from setup.conf (canonical); realsense-ros from the Dockerfile ARG.
   local cur_lib cur_ros
-  cur_lib="$(current_arg LIBREALSENSE_VERSION || true)"
+  cur_lib="$(conf_arg LIBREALSENSE_VERSION || true)"
   cur_ros="$(current_arg REALSENSE_ROS_VERSION || true)"
-  if [[ -z "${cur_lib}" || -z "${cur_ros}" ]]; then
-    echo "bump_realsense_versions.sh: could not parse ARGs from ${DOCKERFILE}" >&2
+  if [[ -z "${cur_lib}" ]]; then
+    echo "bump_realsense_versions.sh: could not parse LIBREALSENSE_VERSION from ${SETUP_CONF}" >&2
+    return 1
+  fi
+  if [[ -z "${cur_ros}" ]]; then
+    echo "bump_realsense_versions.sh: could not parse REALSENSE_ROS_VERSION from ${DOCKERFILE}" >&2
     return 1
   fi
 
@@ -211,7 +241,7 @@ main() {
 
   local changed=0
   if [[ "${new_lib}" != "${cur_lib}" ]]; then
-    set_arg LIBREALSENSE_VERSION "${new_lib}"
+    set_conf_arg LIBREALSENSE_VERSION "${new_lib}"
     echo "LIBREALSENSE_VERSION: ${cur_lib} -> ${new_lib}"
     changed=1
   fi

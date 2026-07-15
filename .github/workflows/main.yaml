@@ -17,7 +17,32 @@ concurrency:
 
 jobs:
 
+  # Single-source the librealsense pin: parse it from config/docker/setup.conf
+  # (the same [build] arg_N line the local build + bump script use) and expose
+  # it as an output so the build-worker call FROMs the matching GHCR SDK. This
+  # removes the old hardcoded `v2.58.2` literal that drifted from setup.conf /
+  # the Dockerfile whenever bump_realsense_versions.sh moved the pin (#130).
+  resolve-librealsense:
+    permissions:
+      contents: read
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.parse.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: parse
+        run: |
+          version="$(grep -oP '^\s*arg_[0-9]+\s*=\s*LIBREALSENSE_VERSION=\K\S+' \
+            config/docker/setup.conf | head -1)"
+          if [ -z "${version}" ]; then
+            echo "resolve-librealsense: could not parse LIBREALSENSE_VERSION from config/docker/setup.conf" >&2
+            exit 1
+          fi
+          echo "version=${version}" >> "${GITHUB_OUTPUT}"
+          echo "Resolved librealsense version: ${version}"
+
   call-docker-build:
+    needs: resolve-librealsense
     permissions:
       contents: read
     strategy:
@@ -34,23 +59,22 @@ jobs:
       platforms: linux/amd64,linux/arm64
       test_tools_version: v0.41.0
       # LIBREALSENSE_IMAGE resolves PER-PLATFORM from the matrix cell's
-      # ubuntu_codename (jammy -> :v2.58.2-jammy, noble -> :v2.58.2-noble): the
-      # SDK is a pure C++ library whose .so is ABI-bound to the Ubuntu release,
-      # not the ROS distro, so it is keyed on the codename. CI PULLS the matching
+      # ubuntu_codename (jammy -> :<ver>-jammy, noble -> :<ver>-noble): the SDK
+      # is a pure C++ library whose .so is ABI-bound to the Ubuntu release, not
+      # the ROS distro, so it is keyed on the codename. CI PULLS the matching
       # prebuilt SDK published by build-librealsense.yaml instead of rebuilding
-      # librealsense. The version literal is pinned inline here: the `env`
-      # context is NOT available in a reusable-workflow call's `with:` (only
-      # matrix/github/needs/inputs/vars are), so it cannot be factored into a
-      # workflow-level env var -- keep it in sync with the LIBREALSENSE_VERSION
-      # ARG in the main Dockerfile and build-librealsense.yaml. Local builds omit
-      # this arg -> the version-scoped Dockerfile default
+      # librealsense. The version comes from the `resolve-librealsense` job,
+      # which parses config/docker/setup.conf -- the ONE canonical pin the local
+      # build + bump script also read, so CI never drifts from it (#130). `needs`
+      # context IS available in a reusable-workflow call's `with:`. Local builds
+      # omit this arg -> the version-scoped Dockerfile default
       # `librealsense:${LIBREALSENSE_VERSION}-${UBUNTU_CODENAME}` (built by
       # script/hooks/pre/build.sh).
       build_args: |
         ROS_DISTRO=${{ matrix.target.ros_distro }}
         ROS_TAG=${{ matrix.target.ros_tag }}
         UBUNTU_CODENAME=${{ matrix.target.ubuntu_codename }}
-        LIBREALSENSE_IMAGE=ghcr.io/ycpss91255-docker/librealsense:v2.58.2-${{ matrix.target.ubuntu_codename }}
+        LIBREALSENSE_IMAGE=ghcr.io/ycpss91255-docker/librealsense:${{ needs.resolve-librealsense.outputs.version }}-${{ matrix.target.ubuntu_codename }}
 
   # Stable-named aggregator so branch protection's required status check does
   # not have to enumerate every matrix entry. Branch protection references

@@ -17,6 +17,21 @@ versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   `dockerfile_guards.bats` regressions.
 
 ### Changed
+- **Moved the canonical librealsense version into `config/docker/setup.conf`**
+  (refs #130) so local builds AND CI read ONE source. setup.conf's `[build]`
+  gains `arg_4 = LIBREALSENSE_VERSION=v2.58.2`; setup.sh flows it into
+  `.env.generated` + compose `build.args`, so the pre-build hook, the main
+  compose build, and CI all pick it up. This also fixes a real drift bug:
+  `.github/workflows/main.yaml` previously hardcoded
+  `librealsense:v2.58.2-<codename>` in the build-worker `build_args`, which the
+  bump script never updated -- after a bump, CI still FROMed the OLD GHCR SDK.
+  main.yaml now has a `resolve-librealsense` job that parses the pin from
+  setup.conf and feeds it to the build-worker call, so CI tracks setup.conf with
+  no manual sync. `script/bump_realsense_versions.sh` rewrites the setup.conf
+  line (new `conf_arg` / `set_conf_arg` helpers) instead of the Dockerfile ARG;
+  the Dockerfile `ARG LIBREALSENSE_VERSION` stays as a documented fallback so a
+  bare `docker build` still works. `REALSENSE_ROS_VERSION` stays in the
+  Dockerfile ARG (no multi-copy problem).
 - **Single-sourced the librealsense SDK version** on the main Dockerfile
   `ARG LIBREALSENSE_VERSION` (refs #128, base#829). The pre-build hook
   `script/hooks/pre/build.sh` now READS the pin (and `UBUNTU_CODENAME`) from the
