@@ -17,6 +17,7 @@ versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   `dockerfile_guards.bats` regressions.
 
 ### Changed
+- Bumped pinned RealSense sources: realsense-ros 4.58.2 -> 4.58.2, librealsense v2.58.2 -> v2.58.3 (realsense-ros declares realsense2 2.58)
 - **Moved the canonical librealsense version into `config/docker/setup.conf`**
   (refs #130) so local builds AND CI read ONE source. setup.conf's `[build]`
   gains `arg_4 = LIBREALSENSE_VERSION=v2.58.2`; setup.sh flows it into
