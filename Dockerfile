@@ -250,7 +250,7 @@ ARG CONFIG_SRC="config"
 # version bump recompiles. NOT floating `latest` -- reproducible builds. The
 # librealsense SDK pin lives in the global LIBREALSENSE_VERSION ARG at the top
 # (the `rs_sdk` FROM must reference it pre-FROM).
-ARG REALSENSE_ROS_VERSION="4.58.2"
+ARG REALSENSE_ROS_VERSION="4.58.3"
 
 # COPY the prebuilt SDK trees in BEFORE the wrapper build (issue #97).
 # librealsense is now consumed as a PREBUILT GHCR image (the `rs_sdk` stage at
