@@ -57,7 +57,6 @@ jobs:
       image_name: realsense_ros2
       cache_variant: ${{ matrix.target.name }}
       platforms: linux/amd64,linux/arm64
-      test_tools_version: v0.41.0
       # LIBREALSENSE_IMAGE resolves PER-PLATFORM from the matrix cell's
       # ubuntu_codename (jammy -> :<ver>-jammy, noble -> :<ver>-noble): the SDK
       # is a pure C++ library whose .so is ABI-bound to the Ubuntu release, not
